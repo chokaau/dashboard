@@ -34,6 +34,9 @@ dev = [
 asyncio_mode = "auto"
 addopts = "--cov=app --cov-report=term-missing --cov-fail-under=80"
 testpaths = ["tests"]
+markers = [
+    "performance: marks tests as performance benchmarks (deselect with '-m not performance')",
+]
 
 [tool.coverage.run]
 source = ["app"]

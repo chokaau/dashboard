@@ -22,6 +22,12 @@ router = APIRouter(prefix="/calls", tags=["calls"])
 # call_id validation pattern: alphanumeric + hyphen + underscore, 1-128 chars
 _CALL_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9\-\_]{0,127}$")
 
+# date_range validation: relative shortcut (e.g. "7d", "30d", "today") or
+# ISO date range "YYYY-MM-DD/YYYY-MM-DD"
+_DATE_RANGE_RE = re.compile(
+    r"^(\d+d|today|yesterday|\d{4}-\d{2}-\d{2}/\d{4}-\d{2}-\d{2})$"
+)
+
 
 # ---------------------------------------------------------------------------
 # GET /calls
@@ -35,6 +41,17 @@ async def list_calls(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     status: str | None = None,
+    date_range: Annotated[
+        str | None,
+        Query(
+            pattern=r"^(\d+d|today|yesterday|\d{4}-\d{2}-\d{2}/\d{4}-\d{2}-\d{2})$",
+            description=(
+                "Optional date range filter. "
+                "Relative: '7d', '30d', '90d', 'today', 'yesterday'. "
+                "Absolute: 'YYYY-MM-DD/YYYY-MM-DD'."
+            ),
+        ),
+    ] = None,
 ) -> dict[str, Any]:
     """Return paginated call list for the authenticated tenant.
 
@@ -52,6 +69,7 @@ async def list_calls(
         page=page,
         page_size=page_size,
         status_filter=status,
+        date_range=date_range,
     )
 
 

@@ -340,6 +340,112 @@ def test_no_phone_number_in_response(client, auth_headers, app_no_redis):
 
 
 # ---------------------------------------------------------------------------
+# date_range query parameter (AC-1)
+# ---------------------------------------------------------------------------
+
+
+def test_get_calls_date_range_accepted(client, auth_headers, app_no_redis):
+    """date_range param is accepted and passed through without error."""
+    redis = _mock_redis_with_calls([])
+    app_no_redis.state.redis = redis
+
+    resp = client.get("/api/calls?date_range=7d", headers=auth_headers)
+    assert resp.status_code == 200
+
+
+def test_get_calls_date_range_invalid_422(client, auth_headers):
+    """date_range value that cannot be parsed returns 422."""
+    resp = client.get("/api/calls?date_range=not-a-valid-range-!!!!", headers=auth_headers)
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# PII guard: no raw phone numbers in logs (AC-11)
+# ---------------------------------------------------------------------------
+
+
+def test_no_phone_number_in_logs(client, auth_headers, app_no_redis):
+    """No AU phone number pattern +61XXXXXXXXX appears in any structlog log record."""
+    import re
+    from unittest.mock import patch, MagicMock
+
+    call = _call_meta(caller_name="", phone_hash="abc123def456abcd")
+    redis = _mock_redis_with_calls([call])
+    app_no_redis.state.redis = redis
+
+    au_phone_re = re.compile(r"\+61[1-9]\d{8}")
+    captured_events: list[dict] = []
+
+    original_warning = None
+
+    def capturing_warning(event, **kwargs):
+        captured_events.append({"event": event, **kwargs})
+
+    def capturing_info(event, **kwargs):
+        captured_events.append({"event": event, **kwargs})
+
+    with patch("app.services.call_list.log") as mock_log:
+        mock_log.warning = capturing_warning
+        mock_log.info = capturing_info
+        resp = client.get("/api/calls", headers=auth_headers)
+
+    assert resp.status_code == 200
+    for record in captured_events:
+        for val in record.values():
+            assert not au_phone_re.search(str(val)), (
+                f"AU phone number found in log record: {record}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Performance (AC-12)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.performance
+def test_call_list_performance_warm_redis(app_no_redis):
+    """P95 < 200ms with warm Redis under sequential requests simulating concurrency."""
+    import time
+    import statistics
+
+    calls = [
+        _call_meta(
+            call_id=f"cc-{i:04d}",
+            start_ts=1_700_000_000.0 - i * 60,
+        )
+        for i in range(20)
+    ]
+    redis = _mock_redis_with_calls(calls)
+    app_no_redis.state.redis = redis
+
+    from fastapi.testclient import TestClient
+    from tests.conftest import mint_jwt
+
+    token = mint_jwt()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    latencies: list[float] = []
+    with TestClient(app_no_redis, raise_server_exceptions=True) as c:
+        # Warm-up
+        c.get("/api/calls", headers=headers)
+        # 10 measured requests
+        for _ in range(10):
+            t0 = time.perf_counter()
+            resp = c.get("/api/calls", headers=headers)
+            latencies.append(time.perf_counter() - t0)
+            assert resp.status_code == 200
+
+    latencies_ms = [l * 1000 for l in latencies]
+    latencies_ms.sort()
+    p95 = latencies_ms[int(len(latencies_ms) * 0.95) - 1]
+    p99_idx = max(int(len(latencies_ms) * 0.99) - 1, len(latencies_ms) - 1)
+    p99 = latencies_ms[p99_idx]
+
+    assert p95 < 200, f"P95 latency {p95:.1f}ms exceeds 200ms threshold"
+    assert p99 < 500, f"P99 latency {p99:.1f}ms exceeds 500ms threshold"
+
+
+# ---------------------------------------------------------------------------
 # Stats boundary in Melbourne timezone
 # ---------------------------------------------------------------------------
 

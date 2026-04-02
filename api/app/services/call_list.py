@@ -218,6 +218,7 @@ async def get_call_list(
     page: int = 1,
     page_size: int = 20,
     status_filter: str | None = None,
+    date_range: str | None = None,
 ) -> dict[str, Any]:
     """Fetch paginated call list for a tenant.
 

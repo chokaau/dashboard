@@ -18,7 +18,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Mock @choka/ui components
 // ---------------------------------------------------------------------------
 
-vi.mock("@choka/ui/src/components/custom/CallHistoryFilterBar", () => ({
+vi.mock("@choka/ui", () => ({
   CallHistoryFilterBar: ({
     activeTab,
     onTabChange,
@@ -59,7 +59,7 @@ vi.mock("@choka/ui/src/components/custom/CallHistoryFilterBar", () => ({
   ),
 }));
 
-vi.mock("@choka/ui/src/components/custom/CallCard", () => ({
+vi.mock("@choka/ui", () => ({
   CallCard: ({
     callerName,
     onClick,
@@ -79,7 +79,7 @@ vi.mock("@choka/ui/src/components/custom/CallCard", () => ({
   ),
 }));
 
-vi.mock("@choka/ui/src/components/custom/EmptyState", () => ({
+vi.mock("@choka/ui", () => ({
   EmptyState: ({ title }: { title: string; description: string; icon: unknown }) => (
     <div data-testid="empty-state" role="status">
       {title}
@@ -87,7 +87,7 @@ vi.mock("@choka/ui/src/components/custom/EmptyState", () => ({
   ),
 }));
 
-vi.mock("@choka/ui/src/components/primitives/Skeleton", () => ({
+vi.mock("@choka/ui", () => ({
   Skeleton: ({ className }: { className?: string }) => (
     <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
   ),

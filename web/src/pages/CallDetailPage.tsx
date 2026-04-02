@@ -9,8 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Clock, Phone, PhoneOff } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { Skeleton } from "@choka/ui/src/components/primitives/Skeleton";
-import { PageError } from "@choka/ui/src/components/primitives/PageError";
+import { PageError, Skeleton } from "@choka/ui";
 
 // ---------------------------------------------------------------------------
 // Types

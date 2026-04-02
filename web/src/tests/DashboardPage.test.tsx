@@ -20,7 +20,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Mock @choka/ui components (avoids cross-package bundler issues in unit tests)
 // ---------------------------------------------------------------------------
 
-vi.mock("@choka/ui/src/components/custom/DashboardStatCard", () => ({
+vi.mock("@choka/ui", () => ({
   DashboardStatCard: ({
     label,
     value,
@@ -41,7 +41,7 @@ vi.mock("@choka/ui/src/components/custom/DashboardStatCard", () => ({
   ),
 }));
 
-vi.mock("@choka/ui/src/components/custom/NeedsCallbackPanel", () => ({
+vi.mock("@choka/ui", () => ({
   NeedsCallbackPanel: ({
     calls,
     isLoading,
@@ -63,7 +63,7 @@ vi.mock("@choka/ui/src/components/custom/NeedsCallbackPanel", () => ({
   ),
 }));
 
-vi.mock("@choka/ui/src/components/custom/CallCard", () => ({
+vi.mock("@choka/ui", () => ({
   CallCard: ({
     callerName,
     onClick,
@@ -83,7 +83,7 @@ vi.mock("@choka/ui/src/components/custom/CallCard", () => ({
   ),
 }));
 
-vi.mock("@choka/ui/src/components/primitives/PageError", () => ({
+vi.mock("@choka/ui", () => ({
   PageError: ({
     title,
     description,

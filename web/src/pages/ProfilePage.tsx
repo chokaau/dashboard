@@ -6,8 +6,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
-import { Skeleton } from "@choka/ui/src/components/primitives/Skeleton";
-import { InlineError } from "@choka/ui/src/components/primitives/InlineError";
+import { InlineError, Skeleton } from "@choka/ui";
 
 // ---------------------------------------------------------------------------
 // Types

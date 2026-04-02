@@ -17,13 +17,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Mock @choka/ui components
 // ---------------------------------------------------------------------------
 
-vi.mock("@choka/ui/src/components/primitives/Skeleton", () => ({
+vi.mock("@choka/ui", () => ({
   Skeleton: ({ className }: { className?: string }) => (
     <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
   ),
 }));
 
-vi.mock("@choka/ui/src/components/primitives/PageError", () => ({
+vi.mock("@choka/ui", () => ({
   PageError: ({
     title,
     description,

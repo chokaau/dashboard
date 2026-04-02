@@ -10,14 +10,9 @@ import { useNavigate } from "react-router-dom";
 import { PhoneOff } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useCallHistoryFilters } from "@/stores/call-history-filters";
-import { CallHistoryFilterBar } from "@choka/ui/src/components/custom/CallHistoryFilterBar";
-import { CallCard } from "@choka/ui/src/components/custom/CallCard";
-import { EmptyState } from "@choka/ui/src/components/custom/EmptyState";
-import { Skeleton } from "@choka/ui/src/components/primitives/Skeleton";
-import type { CallHistoryTab, DateFilter } from "@choka/ui/src/components/custom/CallHistoryFilterBar";
-import type { LeadIntent } from "@choka/ui/src/components/custom/NeedsCallbackPanel";
-import type { CallCardProps } from "@choka/ui/src/components/custom/CallCard";
 import type { CallHistoryStatus, CallHistoryDateRange } from "@/stores/call-history-filters";
+import { CallCard, CallHistoryFilterBar, EmptyState, Skeleton } from "@choka/ui";
+import type { CallCardProps, CallHistoryTab, DateFilter, LeadIntent } from "@choka/ui";
 
 // ---------------------------------------------------------------------------
 // Types

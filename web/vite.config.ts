@@ -6,7 +6,7 @@ import { existsSync } from "fs";
 import type { Plugin } from "vite";
 
 const dashboardSrc = resolve(__dirname, "./src");
-const storybookSrc = resolve(__dirname, "../storybook/src");
+const storybookSrc = resolve(__dirname, "../../storybook/src");
 
 /**
  * Handles all @/ and @choka/ui/src/... alias resolution.
@@ -28,6 +28,11 @@ function chokaAliasPlugin(): Plugin {
     name: "choka-alias",
     enforce: "pre",
     resolveId(source, importer) {
+      // @choka/ui (bare) → storybook/src/index.ts (barrel export)
+      if (source === "@choka/ui") {
+        return resolve(storybookSrc, "index.ts");
+      }
+
       // @choka/ui/src/X → storybook/src/X
       const uiMatch = source.match(/^@choka\/ui\/src\/(.+)/);
       if (uiMatch) {

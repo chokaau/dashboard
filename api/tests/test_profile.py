@@ -208,3 +208,68 @@ def test_put_profile_unknown_fields_ignored(client, auth_headers, app_no_redis):
         resp = client.put("/api/profile", json=profile_with_extra, headers=auth_headers)
 
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# AC6 — PUT then GET returns updated values (round-trip)
+# ---------------------------------------------------------------------------
+
+
+def test_put_then_get_returns_updated_values(client, auth_headers, app_no_redis):
+    """AC6: after a successful PUT, GET /profile reflects the updated values.
+
+    The mock captures what PUT writes so GET reads it back from the same store.
+    """
+    import io
+    import yaml
+
+    # Capture the YAML body written by PUT so GET can read it back.
+    written: dict = {}
+
+    updated_profile = {
+        **_VALID_PROFILE,
+        "business_name": "Updated Business Name",
+        "owner_phone": "+61499999999",
+    }
+
+    s3 = MagicMock()
+    s3.__aenter__ = AsyncMock(return_value=s3)
+    s3.__aexit__ = AsyncMock(return_value=False)
+
+    async def _put_object(**kwargs):
+        if "business.yaml" in kwargs.get("Key", ""):
+            written.update(yaml.safe_load(io.BytesIO(kwargs["Body"])) or {})
+        return {}
+
+    async def _get_object(**kwargs):
+        key = kwargs.get("Key", "")
+        if "business.yaml" in key:
+            data = written if written else updated_profile
+            body = MagicMock()
+            body.read = AsyncMock(return_value=yaml.dump(data).encode())
+            return {"Body": body}
+        if "setup_complete.json" in key:
+            from botocore.exceptions import ClientError
+            raise ClientError(
+                {"Error": {"Code": "NoSuchKey", "Message": "Not Found"}},
+                "GetObject",
+            )
+        raise ValueError(f"Unexpected key: {key}")
+
+    s3.put_object = AsyncMock(side_effect=_put_object)
+    s3.get_object = AsyncMock(side_effect=_get_object)
+
+    session = MagicMock()
+    session.client = MagicMock(return_value=s3)
+
+    with patch("app.routes.profile.aioboto3.Session", return_value=session):
+        put_resp = client.put("/api/profile", json=updated_profile, headers=auth_headers)
+        assert put_resp.status_code == 200
+        assert put_resp.json() == {"status": "updated"}
+
+        get_resp = client.get("/api/profile", headers=auth_headers)
+
+    assert get_resp.status_code == 200
+    body = get_resp.json()
+    assert body["businessName"] == "Updated Business Name"
+    assert body["ownerPhone"] == "+61499999999"

@@ -37,7 +37,6 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 source = ["app"]
-omit = ["app/middleware/auth.py"]
 
 [tool.coverage.report]
 exclude_lines = [

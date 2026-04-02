@@ -32,6 +32,8 @@ def _redis_mock_with_count(count: int) -> MagicMock:
 
     redis = MagicMock()
     redis.pipeline = MagicMock(return_value=pipe)
+    # ping() is awaited by the health route — must be an AsyncMock
+    redis.ping = AsyncMock(return_value=True)
     # aclose() is called in lifespan shutdown — must be awaitable
     redis.aclose = AsyncMock()
     return redis
@@ -47,6 +49,9 @@ def _rate_client(redis_mock=None, route_path: str = "/api/ping"):
 
     redis_url="" in config prevents lifespan auto-connect. After lifespan runs,
     we inject the mock directly onto app.state so the middleware sees it.
+
+    Also patches app.routes.health._check_jwks / _check_s3 so GET /health does
+    not make real outbound HTTP calls (test pool URL returns 404 → 503).
     """
     app = create_app()
 
@@ -61,11 +66,19 @@ def _rate_client(redis_mock=None, route_path: str = "/api/ping"):
     with (
         patch("app.main.get_config", return_value=_RATE_CONFIG),
         patch("app.middleware.auth.JWKSCache.get_keys", _mock_get_keys),
+        patch("app.routes.health._check_jwks", AsyncMock(return_value="ok")),
+        patch("app.routes.health._check_s3", AsyncMock(return_value="ok")),
         TestClient(app, raise_server_exceptions=False) as c,
     ):
         # Lifespan has run — now inject mock redis (overrides the None set by lifespan)
         if redis_mock is not None:
             c.app.state.redis = redis_mock
+        else:
+            # Inject a valid async redis mock for the /health ping check
+            fake = MagicMock()
+            fake.ping = AsyncMock(return_value=True)
+            fake.aclose = AsyncMock()
+            c.app.state.redis = fake
         yield c
 
 

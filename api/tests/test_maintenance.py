@@ -1,7 +1,7 @@
 """Tests for MaintenanceModeMiddleware — story-3-1."""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
@@ -21,37 +21,52 @@ def _make_config(maintenance: bool) -> AppConfig:
     )
 
 
+def _make_app_with_test_route(maintenance: bool):
+    """Create app with a /api/test route and all health sub-checks stubbed."""
+    config = _make_config(maintenance)
+    app = create_app()
+
+    router = APIRouter()
+
+    @router.get("/api/test")
+    async def _test_route():
+        return {"ok": True}
+
+    app.include_router(router)
+    app.state.config = config
+
+    # Inject a mock Redis so /health ping succeeds
+    fake_redis = MagicMock()
+    fake_redis.ping = AsyncMock(return_value=True)
+    fake_redis.aclose = AsyncMock()
+    app.state.redis = fake_redis
+
+    return app, config
+
+
 @pytest.fixture()
 def maintenance_on_client():
-    config = _make_config(True)
-    with patch("app.main.get_config", return_value=config):
-        app = create_app()
-
-        router = APIRouter()
-
-        @router.get("/api/test")
-        async def _test_route():
-            return {"ok": True}
-
-        app.include_router(router)
+    with (
+        patch("app.main.get_config", return_value=_make_config(True)),
+        patch("app.routes.health._check_jwks", AsyncMock(return_value="ok")),
+        patch("app.routes.health._check_s3", AsyncMock(return_value="ok")),
+    ):
+        app, config = _make_app_with_test_route(True)
         with TestClient(app, raise_server_exceptions=False) as c:
+            c.app.state.redis = app.state.redis
             yield c
 
 
 @pytest.fixture()
 def maintenance_off_client():
-    config = _make_config(False)
-    with patch("app.main.get_config", return_value=config):
-        app = create_app()
-
-        router = APIRouter()
-
-        @router.get("/api/test")
-        async def _test_route():
-            return {"ok": True}
-
-        app.include_router(router)
+    with (
+        patch("app.main.get_config", return_value=_make_config(False)),
+        patch("app.routes.health._check_jwks", AsyncMock(return_value="ok")),
+        patch("app.routes.health._check_s3", AsyncMock(return_value="ok")),
+    ):
+        app, config = _make_app_with_test_route(False)
         with TestClient(app, raise_server_exceptions=False) as c:
+            c.app.state.redis = app.state.redis
             yield c
 
 

@@ -20,7 +20,6 @@ export default defineConfig({
         "src/test/**",
         "src/main.tsx",
         "src/vite-env.d.ts",
-        // Scaffold-only files — excluded until story-5-2 implements them fully
         "src/adapters/cognito-auth-provider.tsx",
       ],
     },

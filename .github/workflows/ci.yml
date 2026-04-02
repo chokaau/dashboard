@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test (with coverage)
+        run: pnpm test
+        env:
+          VITE_COGNITO_USER_POOL_ID: test-pool-id
+          VITE_COGNITO_CLIENT_ID: test-client-id
+          VITE_API_BASE_URL: /api
+
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, test]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: pnpm build
+        env:
+          VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
+          VITE_API_BASE_URL: /api
+
+      - name: Verify build artefacts
+        run: |
+          test -f dist/index.html || (echo "ERROR: dist/index.html not found" && exit 1)
+          ASSET_COUNT=$(ls dist/assets/ 2>/dev/null | wc -l)
+          [ "$ASSET_COUNT" -gt 0 ] || (echo "ERROR: no assets in dist/assets/" && exit 1)
+          BUNDLE_SIZE=$(du -sb dist/ | cut -f1)
+          [ "$BUNDLE_SIZE" -lt 5242880 ] || (echo "ERROR: bundle size ${BUNDLE_SIZE} exceeds 5MB" && exit 1)
+          echo "Build OK: ${ASSET_COUNT} assets, ${BUNDLE_SIZE} bytes total"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::737923405927:role/choka-deploy-dev
+          aws-region: ap-southeast-2
+
+      - name: Deploy to S3 (tiered cache headers)
+        run: |
+          # Hashed assets — immutable, cache 1 year
+          aws s3 sync dist/assets/ s3://${{ vars.DASHBOARD_S3_BUCKET }}/assets/ \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete
+
+          # index.html — no-cache (must revalidate)
+          aws s3 cp dist/index.html s3://${{ vars.DASHBOARD_S3_BUCKET }}/index.html \
+            --cache-control "public, max-age=0, must-revalidate"
+
+          # Other root files — short cache
+          aws s3 sync dist/ s3://${{ vars.DASHBOARD_S3_BUCKET }}/ \
+            --exclude "assets/*" \
+            --exclude "index.html" \
+            --cache-control "public, max-age=300" \
+            --delete
+
+      - name: Invalidate CloudFront (index.html only)
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/index.html"

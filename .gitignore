@@ -31,5 +31,11 @@ Thumbs.db
 # Generated docs
 cdocs/
 
+# Vite
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
 # Misc
 *.log

@@ -1,9 +1,10 @@
 /**
- * Application routes (story-5-2).
+ * Application routes (story-5-2, updated story-5-3).
  *
  * / → redirect to /dashboard
  * /dashboard, /calls, /calls/:id, /profile, /billing, /setup — protected
- * /auth/sign-in, /auth/sign-up, /auth/confirm — public
+ * /auth/sign-in, /auth/sign-up, /auth/confirm,
+ * /auth/forgot-password, /auth/reset-password — public
  */
 import { lazy, Suspense } from "react";
 import {
@@ -20,9 +21,13 @@ const CallDetailPage = lazy(() => import("@/pages/CallDetailPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const BillingPage = lazy(() => import("@/pages/BillingPage"));
 const SetupPage = lazy(() => import("@/pages/SetupPage"));
-const SignInPage = lazy(() => import("@/pages/SignInPage"));
-const SignUpPage = lazy(() => import("@/pages/SignUpPage"));
-const ConfirmPage = lazy(() => import("@/pages/ConfirmPage"));
+
+// Auth pages (story-5-3 implementations)
+const SignInPage = lazy(() => import("@/pages/auth/SignInPage"));
+const SignUpPage = lazy(() => import("@/pages/auth/SignUpPage"));
+const ConfirmSignUpPage = lazy(() => import("@/pages/auth/ConfirmSignUpPage"));
+const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPasswordPage"));
 
 function PageShell() {
   return (
@@ -48,7 +53,9 @@ export const router = createBrowserRouter([
       { path: "setup", element: <SetupPage /> },
       { path: "auth/sign-in", element: <SignInPage /> },
       { path: "auth/sign-up", element: <SignUpPage /> },
-      { path: "auth/confirm", element: <ConfirmPage /> },
+      { path: "auth/confirm", element: <ConfirmSignUpPage /> },
+      { path: "auth/forgot-password", element: <ForgotPasswordPage /> },
+      { path: "auth/reset-password", element: <ResetPasswordPage /> },
     ],
   },
 ]);

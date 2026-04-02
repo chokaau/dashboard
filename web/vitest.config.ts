@@ -15,6 +15,16 @@ export default defineConfig({
       thresholds: {
         lines: 80,
         branches: 70,
+        // Critical path overrides: adapters and core lib files require 95% line coverage
+        "src/adapters/**": {
+          lines: 95,
+        },
+        "src/lib/api-client.ts": {
+          lines: 95,
+        },
+        "src/lib/query-client.ts": {
+          lines: 95,
+        },
       },
       include: ["src/**/*.{ts,tsx}"],
       exclude: [

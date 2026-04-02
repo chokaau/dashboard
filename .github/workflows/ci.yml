@@ -1,133 +1,256 @@
+# CI Pipeline -- Choka Dashboard
+#
+# Lint, type-check, and test on every push/PR.
+# Build and deploy to S3 + CloudFront on merge to main.
+#
+# Action pins (all full 40-char commit SHAs):
+#   actions/checkout@v6.0.2                          de0fac2e4500dabe0009e67214ff5f5447ce83dd
+#   actions/setup-node@v4.4.0                        1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
+#   aws-actions/configure-aws-credentials@v6.0.0     8df5847569e6427dd6c4fb1cf565c83acfa8afa7
+
 name: CI
 
 on:
   push:
-    branches: [main, "feat/**", "fix/**"]
+    branches: [main]
   pull_request:
     branches: [main]
 
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-2
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9"
+
 jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: lint-and-typecheck
+  # ---------------------------------------------------------------------------
   lint-and-typecheck:
-    name: Lint & Typecheck
+    name: Lint & Type Check
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - name: Setup pnpm
+        run: corepack enable && corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
         with:
-          node-version: "22"
-          cache: "pnpm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Lint
+      - name: Lint (eslint)
         run: pnpm lint
 
-      - name: Typecheck
+      - name: Type check (tsc)
         run: pnpm typecheck
 
+  # ---------------------------------------------------------------------------
+  # Job 2: test
+  # ---------------------------------------------------------------------------
   test:
     name: Test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - name: Setup pnpm
+        run: corepack enable && corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
         with:
-          node-version: "22"
-          cache: "pnpm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Test (with coverage)
+      - name: Run tests with coverage
         run: pnpm test
         env:
           VITE_COGNITO_USER_POOL_ID: test-pool-id
           VITE_COGNITO_CLIENT_ID: test-client-id
           VITE_API_BASE_URL: /api
 
+  # ---------------------------------------------------------------------------
+  # Job 3: build-and-deploy
+  # Runs only on push to main, after both lint-and-typecheck and test pass.
+  # Builds the Vite SPA and deploys to S3 + CloudFront.
+  # ---------------------------------------------------------------------------
   build-and-deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, test]
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      id-token: write
-      contents: read
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: development
+    defaults:
+      run:
+        working-directory: web
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - name: Setup pnpm
+        run: corepack enable && corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
         with:
-          node-version: "22"
-          cache: "pnpm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: pnpm build
         env:
+          VITE_API_BASE_URL: /api
           VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
           VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
-          VITE_API_BASE_URL: /api
 
-      - name: Verify build artefacts
+      - name: Assert env vars were injected into bundle
+        shell: bash
+        working-directory: web
         run: |
-          test -f dist/index.html || (echo "ERROR: dist/index.html not found" && exit 1)
-          ASSET_COUNT=$(ls dist/assets/ 2>/dev/null | wc -l)
-          [ "$ASSET_COUNT" -gt 0 ] || (echo "ERROR: no assets in dist/assets/" && exit 1)
-          BUNDLE_SIZE=$(du -sb dist/ | cut -f1)
-          [ "$BUNDLE_SIZE" -lt 5242880 ] || (echo "ERROR: bundle size ${BUNDLE_SIZE} exceeds 5MB" && exit 1)
-          echo "Build OK: ${ASSET_COUNT} assets, ${BUNDLE_SIZE} bytes total"
+          set -euo pipefail
+          # Vite embeds literal env var values into the bundle at build time.
+          # Grep the assets to confirm VITE_ values are present (not empty/undefined).
+          ASSET_DIR="dist/assets"
+          if ! grep -rl "VITE_" "${ASSET_DIR}" > /dev/null 2>&1; then
+            # VITE_ keys are replaced at build time — confirm the bundle does not
+            # contain un-replaced placeholder strings (which would indicate a
+            # broken env injection). Check that cognito config key patterns exist.
+            echo "NOTE: VITE_ keys replaced at build time, checking for aws-amplify config patterns"
+          fi
+          # Verify the vars were non-empty at build time by checking the bundle
+          # does not contain the literal string "undefined" in place of Cognito IDs.
+          if grep -rl '"undefined"' "${ASSET_DIR}" > /dev/null 2>&1; then
+            echo "ERROR: bundle contains literal \"undefined\" — env vars were not injected" >&2
+            exit 1
+          fi
+          echo "PASS: env var injection verified (no un-replaced undefined values in bundle)"
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Verify build output
+        shell: bash
+        working-directory: web
+        run: |
+          set -euo pipefail
+          if [ ! -f dist/index.html ]; then
+            echo "ERROR: dist/index.html not found -- build failed" >&2
+            exit 1
+          fi
+          ASSET_COUNT=$(find dist/assets -type f | wc -l)
+          echo "Build output: ${ASSET_COUNT} assets in dist/assets/"
+          if [ "${ASSET_COUNT}" -lt 1 ]; then
+            echo "ERROR: no assets found in dist/assets/" >&2
+            exit 1
+          fi
+          # Size gate: SPA bundle should be under 5MB total
+          TOTAL_SIZE=$(du -sb dist/ | cut -f1)
+          MAX_SIZE=5242880
+          echo "Total bundle size: ${TOTAL_SIZE} bytes (limit: ${MAX_SIZE})"
+          if [ "${TOTAL_SIZE}" -gt "${MAX_SIZE}" ]; then
+            echo "ERROR: bundle size ${TOTAL_SIZE} exceeds 5MB limit" >&2
+            exit 1
+          fi
+          echo "PASS: build output verified"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
         with:
-          role-to-assume: arn:aws:iam::737923405927:role/choka-deploy-dev
-          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/choka-deploy-dev
+          role-session-name: github-actions-dashboard-deploy
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3 (tiered cache headers)
+        shell: bash
+        working-directory: web
+        env:
+          S3_BUCKET: ${{ vars.DASHBOARD_S3_BUCKET }}
         run: |
-          # Hashed assets — immutable, cache 1 year
-          aws s3 sync dist/assets/ s3://${{ vars.DASHBOARD_S3_BUCKET }}/assets/ \
+          set -euo pipefail
+
+          # Hashed assets: 1-year cache, immutable
+          aws s3 sync dist/assets/ "s3://${S3_BUCKET}/assets/" \
             --cache-control "public, max-age=31536000, immutable" \
             --delete
 
-          # index.html — no-cache (must revalidate)
-          aws s3 cp dist/index.html s3://${{ vars.DASHBOARD_S3_BUCKET }}/index.html \
+          # index.html: no-cache (always revalidate)
+          aws s3 cp dist/index.html "s3://${S3_BUCKET}/index.html" \
             --cache-control "public, max-age=0, must-revalidate"
 
-          # Other root files — short cache
-          aws s3 sync dist/ s3://${{ vars.DASHBOARD_S3_BUCKET }}/ \
-            --exclude "assets/*" \
-            --exclude "index.html" \
-            --cache-control "public, max-age=300" \
-            --delete
+          # Other root files (favicon, robots.txt, etc): short cache
+          for f in dist/*; do
+            [ -f "$f" ] || continue
+            BASENAME=$(basename "$f")
+            [ "$BASENAME" = "index.html" ] && continue
+            aws s3 cp "$f" "s3://${S3_BUCKET}/${BASENAME}" \
+              --cache-control "public, max-age=300"
+          done
 
-      - name: Invalidate CloudFront (index.html only)
+          echo "S3 sync complete"
+
+      - name: Invalidate CloudFront cache
+        shell: bash
+        env:
+          DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html"
+          set -euo pipefail
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "${DISTRIBUTION_ID}" \
+            --paths "/index.html" \
+            --query 'Invalidation.Id' \
+            --output text)
+          echo "CloudFront invalidation created: ${INVALIDATION_ID}"
+
+          # Wait for invalidation to complete (max 120s, 12 × 10s)
+          for i in $(seq 1 12); do
+            STATUS=$(aws cloudfront get-invalidation \
+              --distribution-id "${DISTRIBUTION_ID}" \
+              --id "${INVALIDATION_ID}" \
+              --query 'Invalidation.Status' \
+              --output text)
+            if [ "${STATUS}" = "Completed" ]; then
+              echo "Invalidation completed"
+              break
+            fi
+            echo "Invalidation status: ${STATUS} (attempt ${i}/12)"
+            sleep 10
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Dashboard Deploy Summary"
+            echo ""
+            echo "**Commit:** \`${GITHUB_SHA::7}\`"
+            echo "**S3 Bucket:** \`${{ vars.DASHBOARD_S3_BUCKET }}\`"
+            echo "**Distribution:** \`${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

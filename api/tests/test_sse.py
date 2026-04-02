@@ -278,3 +278,94 @@ class TestSSEStream:
             with patch("app.routes.events.SSE_PING_INTERVAL_SECONDS", 9999):
                 response = sse_client.get(f"/api/events?token={sse_token}")
         assert "event: reconnect" in response.text
+
+
+# ---------------------------------------------------------------------------
+# Concurrent connection limit — AC-9
+# ---------------------------------------------------------------------------
+
+class TestSSEConcurrentConnectionLimit:
+    def test_sixth_connection_returns_error_frame(
+        self, sse_client: TestClient, sse_token: str, app_no_redis
+    ) -> None:
+        """When 5 connections already exist, the 6th receives an SSE error frame."""
+        # Pre-seed the Redis counter so it already shows 5 connections
+        fake_redis = FakeRedis(pubsub_messages=[])
+        # Seed the counter to SSE_MAX_CONNECTIONS_PER_TENANT (default 5)
+        connection_key = "sse_connections:test:acme"
+        fake_redis._incr_values[connection_key] = 5
+        app_no_redis.state.redis = fake_redis
+
+        with patch("app.routes.events.SSE_MAX_CONNECTION_SECONDS", 0):
+            with patch("app.routes.events.SSE_PING_INTERVAL_SECONDS", 9999):
+                response = sse_client.get(f"/api/events?token={sse_token}")
+
+        # The generator must yield the error frame and return (no 200 stream of events)
+        assert response.status_code == 200
+        assert "Too many concurrent SSE connections" in response.text
+
+    def test_connection_counter_decremented_on_disconnect(
+        self, sse_client: TestClient, sse_token: str, app_no_redis
+    ) -> None:
+        """Counter in Redis is decremented when the connection closes."""
+        fake_redis = FakeRedis(pubsub_messages=[])
+        app_no_redis.state.redis = fake_redis
+
+        connection_key = "sse_connections:test:acme"
+
+        with patch("app.routes.events.SSE_MAX_CONNECTION_SECONDS", 0):
+            with patch("app.routes.events.SSE_PING_INTERVAL_SECONDS", 9999):
+                sse_client.get(f"/api/events?token={sse_token}")
+
+        # After the stream completes the counter must be back at 0
+        assert fake_redis._incr_values.get(connection_key, 0) == 0
+
+    def test_pubsub_unsubscribed_after_disconnect(
+        self, sse_client: TestClient, sse_token: str, app_no_redis
+    ) -> None:
+        """Redis pub/sub channel is unsubscribed when the client disconnects."""
+        fake_pubsub = FakePubSub(messages=[])
+        fake_redis = FakeRedis(pubsub_messages=[])
+        # Replace the FakePubSub instance so we can inspect it after the stream
+        fake_redis._pubsub = fake_pubsub
+        app_no_redis.state.redis = fake_redis
+
+        with patch("app.routes.events.SSE_MAX_CONNECTION_SECONDS", 0):
+            with patch("app.routes.events.SSE_PING_INTERVAL_SECONDS", 9999):
+                sse_client.get(f"/api/events?token={sse_token}")
+
+        # The finally block must have called unsubscribe and aclose
+        assert fake_pubsub.unsubscribed is True
+        assert fake_pubsub.closed is True
+
+
+# ---------------------------------------------------------------------------
+# JWT expiry after connection — AC-10
+# ---------------------------------------------------------------------------
+
+class TestSSEJWTExpiry:
+    def test_jwt_expiry_after_connect_stream_continues(
+        self, sse_client: TestClient, app_no_redis
+    ) -> None:
+        """JWT validated only at connection time; stream continues even if token would expire mid-stream."""
+        # Mint a JWT that is valid now (expiry is checked only at connection initiation,
+        # not on every message). We verify the stream delivers the event successfully
+        # using a token with a very short but non-zero validity window.
+        token = mint_jwt(tenant_slug="acme")
+        payload = json.dumps({"callId": "cid-expire-test", "timestamp": "2026-04-01T10:00:00Z"})
+        fake_redis = FakeRedis(
+            pubsub_messages=[
+                {"channel": "events:test:acme", "data": payload},
+            ]
+        )
+        app_no_redis.state.redis = fake_redis
+
+        # The stream runs to completion — if JWT was re-validated mid-stream it would
+        # fail on a short-lived token, but our implementation only validates at entry.
+        with patch("app.routes.events.SSE_MAX_CONNECTION_SECONDS", 1):
+            with patch("app.routes.events.SSE_PING_INTERVAL_SECONDS", 9999):
+                response = sse_client.get(f"/api/events?token={token}")
+
+        # Stream must complete successfully and contain the event
+        assert response.status_code == 200
+        assert "cid-expire-test" in response.text

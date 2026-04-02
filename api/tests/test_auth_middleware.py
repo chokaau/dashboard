@@ -354,3 +354,36 @@ async def test_jwks_cache_returns_stale_keys_when_refresh_fails() -> None:
 
     # Should get the stale cached keys back, not raise
     assert keys == _FAKE_KEYS
+
+
+# ---------------------------------------------------------------------------
+# AC6 — singleflight: 10 concurrent requests with expired cache → 1 JWKS fetch
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_jwks_cache_singleflight_10_concurrent_one_fetch() -> None:
+    """10 concurrent get_keys() calls with an expired cache trigger exactly 1
+    HTTP fetch (singleflight via asyncio.Lock — AC6)."""
+    import asyncio
+    import respx
+    import httpx
+    from app.middleware.auth import JWKSCache, _JWKS_TTL
+    import time
+
+    cache = JWKSCache()
+    # Force cache to appear expired
+    cache._fetched_at = time.monotonic() - (_JWKS_TTL + 1)
+
+    with respx.mock:
+        route = respx.get(_TEST_JWKS_URL).mock(
+            return_value=httpx.Response(200, json={"keys": _FAKE_KEYS})
+        )
+        results = await asyncio.gather(
+            *[cache.get_keys(_TEST_JWKS_URL) for _ in range(10)]
+        )
+
+    # All 10 callers should receive the correct keys
+    assert all(r == _FAKE_KEYS for r in results)
+    # The HTTP endpoint was called exactly once (singleflight)
+    assert route.call_count == 1

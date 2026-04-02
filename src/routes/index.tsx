@@ -1,8 +1,8 @@
 /**
- * Application routes (story-5-2, updated story-5-3).
+ * Application routes (story-5-2, updated story-5-3, story-5-10).
  *
  * / → redirect to /dashboard
- * /dashboard, /calls, /calls/:id, /profile, /billing, /setup — protected
+ * /dashboard, /calls, /calls/:id, /profile, /billing, /setup — protected (AuthGuard)
  * /auth/sign-in, /auth/sign-up, /auth/confirm,
  * /auth/forgot-password, /auth/reset-password — public
  */
@@ -13,6 +13,7 @@ import {
   Outlet,
 } from "react-router-dom";
 import { PageErrorBoundary } from "@/components/error-boundaries/PageErrorBoundary";
+import { AuthGuard } from "@/components/AuthGuard";
 
 // Lazy-loaded pages (code-split per route)
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
@@ -39,18 +40,33 @@ function PageShell() {
   );
 }
 
+function ProtectedShell() {
+  return (
+    <AuthGuard>
+      <PageShell />
+    </AuthGuard>
+  );
+}
+
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <PageShell />,
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: "dashboard", element: <DashboardPage /> },
-      { path: "calls", element: <CallHistoryPage /> },
-      { path: "calls/:id", element: <CallDetailPage /> },
-      { path: "profile", element: <ProfilePage /> },
-      { path: "billing", element: <BillingPage /> },
-      { path: "setup", element: <SetupPage /> },
+      // Protected routes
+      {
+        element: <ProtectedShell />,
+        children: [
+          { path: "dashboard", element: <DashboardPage /> },
+          { path: "calls", element: <CallHistoryPage /> },
+          { path: "calls/:id", element: <CallDetailPage /> },
+          { path: "profile", element: <ProfilePage /> },
+          { path: "billing", element: <BillingPage /> },
+          { path: "setup", element: <SetupPage /> },
+        ],
+      },
+      // Public auth routes
       { path: "auth/sign-in", element: <SignInPage /> },
       { path: "auth/sign-up", element: <SignUpPage /> },
       { path: "auth/confirm", element: <ConfirmSignUpPage /> },

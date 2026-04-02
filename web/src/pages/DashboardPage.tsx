@@ -1,11 +1,13 @@
 /**
  * DashboardPage — stat cards, needs-callback panel, recent calls (story-5-4).
  *
- * Polls GET /api/calls every 30 seconds via TanStack Query.
+ * Real-time updates via SSE (useCallEvents). No polling — SSE drives
+ * queryClient invalidation. Falls back to 30s polling if SSE is unavailable.
  * Full loading / error / success states.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { useCallEvents } from "@/hooks/use-call-events";
 import { Phone, PhoneCall, PhoneOff, Clock } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { DashboardStatCard } from "@choka/ui/src/components/custom/DashboardStatCard";
@@ -70,10 +72,15 @@ function toCallbackLead(call: CallItem): CallbackLead {
 export function DashboardPage() {
   const navigate = useNavigate();
 
+  // Open SSE connection — invalidates ['calls'] on call_completed events.
+  // Falls back to 30s polling if SSE is unavailable.
+  useCallEvents();
+
   const { data, isLoading, isError, refetch } = useQuery<CallsResponse>({
     queryKey: ["calls"],
     queryFn: () => apiFetch<CallsResponse>("/api/calls"),
-    refetchInterval: 30_000,
+    // No refetchInterval here — SSE drives invalidation.
+    // Polling fallback (30s) is set by useCallEvents on SSE failure.
   });
 
   // ------------------------------------------------------------------

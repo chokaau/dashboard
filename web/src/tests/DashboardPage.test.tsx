@@ -104,6 +104,11 @@ vi.mock("@choka/ui/src/components/primitives/PageError", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock useCallEvents — no-op in unit tests (SSE tested separately)
+vi.mock("@/hooks/use-call-events", () => ({
+  useCallEvents: () => undefined,
+}));
+
 // Mock apiFetch
 // ---------------------------------------------------------------------------
 const mockApiFetch = vi.fn();

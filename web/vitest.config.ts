@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
@@ -21,6 +22,10 @@ export default defineConfig({
         "src/main.tsx",
         "src/vite-env.d.ts",
         "src/adapters/cognito-auth-provider.tsx",
+        // Stale placeholder stubs superseded by src/pages/auth/* implementations
+        "src/pages/SignInPage.tsx",
+        "src/pages/SignUpPage.tsx",
+        "src/pages/ConfirmPage.tsx",
       ],
     },
   },

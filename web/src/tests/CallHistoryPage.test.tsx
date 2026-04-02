@@ -70,6 +70,7 @@ vi.mock("@choka/ui/src/components/custom/CallCard", () => ({
     <div
       data-testid="call-card"
       onClick={onClick}
+      onKeyDown={(e) => e.key === "Enter" && onClick?.()}
       role="button"
       tabIndex={0}
     >

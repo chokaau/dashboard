@@ -1,10 +1,12 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+api/.venv/
 
 # Build output
-dist/
+web/dist/
 build/
+api/.coverage
 
 # Environment
 .env
@@ -13,9 +15,10 @@ build/
 
 # Claude AI
 .claude/
+cdocs/
 
 # Coverage
-coverage/
+web/coverage/
 .nyc_output/
 
 # IDE
@@ -28,8 +31,9 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Generated docs
-cdocs/
+# Cache
+**/__pycache__/
+**/.pytest_cache/
 
 # Vite
 .vite/

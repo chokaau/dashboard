@@ -111,7 +111,17 @@ async def get_recording(
                 if code in ("NoSuchKey", "NoSuchBucket"):
                     raise HTTPException(status_code=404, detail="Not found") from exc
                 if code == "InvalidRange":
-                    raise HTTPException(status_code=416, detail="Range Not Satisfiable") from exc
+                    # Proxy Content-Range header from S3 error response if present
+                    content_range = (
+                        exc.response.get("ResponseMetadata", {})
+                        .get("HTTPHeaders", {})
+                        .get("content-range", "")
+                    )
+                    raise HTTPException(
+                        status_code=416,
+                        detail="Range Not Satisfiable",
+                        headers={"Content-Range": content_range} if content_range else None,
+                    ) from exc
                 raise HTTPException(status_code=500, detail="Storage error") from exc
 
             status_code = 206 if range_header else 200

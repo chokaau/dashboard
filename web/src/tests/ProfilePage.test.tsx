@@ -12,18 +12,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-vi.mock("@choka/ui", () => ({
-  Skeleton: ({ className }: { className?: string }) => (
-    <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
-  ),
-}));
-
-vi.mock("@choka/ui", () => ({
-  InlineError: ({ message }: { message: string }) => (
-    <div role="alert" data-testid="inline-error">{message}</div>
-  ),
-}));
-
 const mockApiFetch = vi.fn();
 vi.mock("@/lib/api-client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
@@ -46,6 +34,16 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 }));
 
 import { ProfilePage } from "@/pages/ProfilePage";
+
+vi.mock("@choka/ui", () => ({
+Skeleton: ({ className }: { className?: string }) => (
+    <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
+  ),
+InlineError: ({ message }: { message: string }) => (
+    <div role="alert" data-testid="inline-error">{message}</div>
+  ),
+}));
+
 
 function makeQC() {
   return new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });

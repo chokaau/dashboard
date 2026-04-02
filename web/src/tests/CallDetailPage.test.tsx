@@ -17,32 +17,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Mock @choka/ui components
 // ---------------------------------------------------------------------------
 
-vi.mock("@choka/ui", () => ({
-  Skeleton: ({ className }: { className?: string }) => (
-    <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
-  ),
-}));
-
-vi.mock("@choka/ui", () => ({
-  PageError: ({
-    title,
-    description,
-    onRetry,
-  }: {
-    title?: string;
-    description: string;
-    onRetry: () => void;
-  }) => (
-    <div role="alert">
-      {title && <h2>{title}</h2>}
-      <p>{description}</p>
-      <button type="button" onClick={onRetry}>
-        Try again
-      </button>
-    </div>
-  ),
-}));
-
 // ---------------------------------------------------------------------------
 // Mock apiFetch
 // ---------------------------------------------------------------------------
@@ -73,6 +47,30 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 }));
 
 import { CallDetailPage } from "@/pages/CallDetailPage";
+
+vi.mock("@choka/ui", () => ({
+Skeleton: ({ className }: { className?: string }) => (
+    <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
+  ),
+PageError: ({
+    title,
+    description,
+    onRetry,
+  }: {
+    title?: string;
+    description: string;
+    onRetry: () => void;
+  }) => (
+    <div role="alert">
+      {title && <h2>{title}</h2>}
+      <p>{description}</p>
+      <button type="button" onClick={onRetry}>
+        Try again
+      </button>
+    </div>
+  ),
+}));
+
 
 // ---------------------------------------------------------------------------
 // Helpers

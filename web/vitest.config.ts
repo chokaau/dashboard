@@ -30,8 +30,9 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      "@": resolve(__dirname, "./src"),
-    },
+    alias: [
+      { find: "@choka/ui", replacement: resolve(__dirname, "../../storybook/src/index.ts") },
+      { find: /^@\/(.*)/, replacement: resolve(__dirname, "./src/$1") },
+    ],
   },
 });

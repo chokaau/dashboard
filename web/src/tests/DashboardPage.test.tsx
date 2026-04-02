@@ -20,89 +20,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Mock @choka/ui components (avoids cross-package bundler issues in unit tests)
 // ---------------------------------------------------------------------------
 
-vi.mock("@choka/ui", () => ({
-  DashboardStatCard: ({
-    label,
-    value,
-    isLoading,
-  }: {
-    label: string;
-    value?: string;
-    isLoading?: boolean;
-  }) => (
-    <div data-testid="stat-card">
-      <span>{label}</span>
-      {isLoading ? (
-        <div className="animate-pulse" />
-      ) : (
-        <span data-testid="stat-value">{value}</span>
-      )}
-    </div>
-  ),
-}));
-
-vi.mock("@choka/ui", () => ({
-  NeedsCallbackPanel: ({
-    calls,
-    isLoading,
-  }: {
-    calls: Array<{ callerName: string }>;
-    isLoading?: boolean;
-  }) => (
-    <div data-testid="callback-panel">
-      {isLoading ? (
-        <div className="animate-pulse" />
-      ) : (
-        calls.map((c, i) => (
-          <div key={i} data-testid="callback-lead">
-            {c.callerName}
-          </div>
-        ))
-      )}
-    </div>
-  ),
-}));
-
-vi.mock("@choka/ui", () => ({
-  CallCard: ({
-    callerName,
-    onClick,
-  }: {
-    callerName: string;
-    onClick?: () => void;
-  }) => (
-    <div
-      data-testid="call-card"
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && onClick?.()}
-    >
-      {callerName}
-    </div>
-  ),
-}));
-
-vi.mock("@choka/ui", () => ({
-  PageError: ({
-    title,
-    description,
-    onRetry,
-  }: {
-    title?: string;
-    description: string;
-    onRetry: () => void;
-  }) => (
-    <div role="alert">
-      {title && <h2>{title}</h2>}
-      <p>{description}</p>
-      <button type="button" onClick={onRetry}>
-        Try again
-      </button>
-    </div>
-  ),
-}));
-
 // ---------------------------------------------------------------------------
 // Mock useCallEvents — no-op in unit tests (SSE tested separately)
 vi.mock("@/hooks/use-call-events", () => ({
@@ -138,6 +55,81 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 }));
 
 import { DashboardPage } from "@/pages/DashboardPage";
+
+vi.mock("@choka/ui", () => ({
+DashboardStatCard: ({
+    label,
+    value,
+    isLoading,
+  }: {
+    label: string;
+    value?: string;
+    isLoading?: boolean;
+  }) => (
+    <div data-testid="stat-card">
+      <span>{label}</span>
+      {isLoading ? (
+        <div className="animate-pulse" />
+      ) : (
+        <span data-testid="stat-value">{value}</span>
+      )}
+    </div>
+  ),
+NeedsCallbackPanel: ({
+    calls,
+    isLoading,
+  }: {
+    calls: Array<{ callerName: string }>;
+    isLoading?: boolean;
+  }) => (
+    <div data-testid="callback-panel">
+      {isLoading ? (
+        <div className="animate-pulse" />
+      ) : (
+        calls.map((c, i) => (
+          <div key={i} data-testid="callback-lead">
+            {c.callerName}
+          </div>
+        ))
+      )}
+    </div>
+  ),
+CallCard: ({
+    callerName,
+    onClick,
+  }: {
+    callerName: string;
+    onClick?: () => void;
+  }) => (
+    <div
+      data-testid="call-card"
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onClick?.()}
+    >
+      {callerName}
+    </div>
+  ),
+PageError: ({
+    title,
+    description,
+    onRetry,
+  }: {
+    title?: string;
+    description: string;
+    onRetry: () => void;
+  }) => (
+    <div role="alert">
+      {title && <h2>{title}</h2>}
+      <p>{description}</p>
+      <button type="button" onClick={onRetry}>
+        Try again
+      </button>
+    </div>
+  ),
+}));
+
 
 // ---------------------------------------------------------------------------
 // Sample data

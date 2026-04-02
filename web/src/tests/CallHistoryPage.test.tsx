@@ -18,8 +18,39 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Mock @choka/ui components
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Mock apiFetch
+// ---------------------------------------------------------------------------
+
+const mockApiFetch = vi.fn();
+vi.mock("@/lib/api-client", () => ({
+  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
+  ApiError: class ApiError extends Error {
+    constructor(
+      public status: number,
+      message: string,
+      public code?: string
+    ) {
+      super(message);
+      this.name = "ApiError";
+    }
+  },
+}));
+
+vi.mock("@/adapters/cognito-auth-provider", () => ({
+  useCognitoAuth: () => ({
+    isLoaded: true,
+    isAuthenticated: true,
+    user: { username: "owner", tenantSlug: "acme" },
+    signOut: vi.fn(),
+    getAccessToken: vi.fn().mockResolvedValue("tok"),
+  }),
+}));
+
+import { CallHistoryPage } from "@/pages/CallHistoryPage";
+
 vi.mock("@choka/ui", () => ({
-  CallHistoryFilterBar: ({
+CallHistoryFilterBar: ({
     activeTab,
     onTabChange,
     dateFilter,
@@ -57,10 +88,7 @@ vi.mock("@choka/ui", () => ({
       </button>
     </div>
   ),
-}));
-
-vi.mock("@choka/ui", () => ({
-  CallCard: ({
+CallCard: ({
     callerName,
     onClick,
   }: {
@@ -77,52 +105,16 @@ vi.mock("@choka/ui", () => ({
       {callerName}
     </div>
   ),
-}));
-
-vi.mock("@choka/ui", () => ({
-  EmptyState: ({ title }: { title: string; description: string; icon: unknown }) => (
+EmptyState: ({ title }: { title: string; description: string; icon: unknown }) => (
     <div data-testid="empty-state" role="status">
       {title}
     </div>
   ),
-}));
-
-vi.mock("@choka/ui", () => ({
-  Skeleton: ({ className }: { className?: string }) => (
+Skeleton: ({ className }: { className?: string }) => (
     <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
   ),
 }));
 
-// ---------------------------------------------------------------------------
-// Mock apiFetch
-// ---------------------------------------------------------------------------
-
-const mockApiFetch = vi.fn();
-vi.mock("@/lib/api-client", () => ({
-  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
-  ApiError: class ApiError extends Error {
-    constructor(
-      public status: number,
-      message: string,
-      public code?: string
-    ) {
-      super(message);
-      this.name = "ApiError";
-    }
-  },
-}));
-
-vi.mock("@/adapters/cognito-auth-provider", () => ({
-  useCognitoAuth: () => ({
-    isLoaded: true,
-    isAuthenticated: true,
-    user: { username: "owner", tenantSlug: "acme" },
-    signOut: vi.fn(),
-    getAccessToken: vi.fn().mockResolvedValue("tok"),
-  }),
-}));
-
-import { CallHistoryPage } from "@/pages/CallHistoryPage";
 
 // ---------------------------------------------------------------------------
 // Helpers

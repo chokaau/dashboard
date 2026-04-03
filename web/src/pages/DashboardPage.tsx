@@ -1,5 +1,6 @@
 /**
  * DashboardPage — stat cards, needs-callback panel, recent calls (story-5-4).
+ * Updated dashboard-10: shows ActivationBanner when activation_status is "pending".
  *
  * Real-time updates via SSE (useCallEvents). No polling — SSE drives
  * queryClient invalidation. Falls back to 30s polling if SSE is unavailable.
@@ -10,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useCallEvents } from "@/hooks/use-call-events";
 import { Phone, PhoneCall, PhoneOff, Clock } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { ActivationBanner } from "@/components/ActivationBanner";
 import { CallCard, DashboardStatCard, NeedsCallbackPanel, PageError } from "@chokaau/ui";
 import type { CallCardProps, CallbackLead, LeadIntent } from "@chokaau/ui";
 
@@ -39,6 +41,15 @@ interface CallsResponse {
   calls: CallItem[];
   stats: CallsStats;
   pagination: { page: number; pageSize: number; total: number };
+}
+
+interface BillingResponse {
+  plan: string;
+  trialDaysRemaining: number;
+  trialEndDate: string;
+  isTrialExpired: boolean;
+  activationStatus: "none" | "pending" | "active";
+  product: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +88,13 @@ export function DashboardPage() {
     queryFn: () => apiFetch<CallsResponse>("/api/calls"),
     // No refetchInterval here — SSE drives invalidation.
     // Polling fallback (30s) is set by useCallEvents on SSE failure.
+  });
+
+  const { data: billingData } = useQuery<BillingResponse>({
+    queryKey: ["billing"],
+    queryFn: () => apiFetch<BillingResponse>("/api/billing"),
+    // Background fetch — does not block dashboard render
+    staleTime: 60_000,
   });
 
   // ------------------------------------------------------------------
@@ -122,6 +140,9 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 p-6">
+      {/* Activation banner — shown when pending activation */}
+      <ActivationBanner activationStatus={billingData?.activationStatus ?? "none"} />
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <DashboardStatCard

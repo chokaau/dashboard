@@ -14,7 +14,8 @@ from app.middleware.maintenance import MaintenanceModeMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_log import RequestLogMiddleware
 from app.middleware.auth import JWTAuthMiddleware
-from app.routes import billing, calls, events, health, profile, recordings, register, setup
+<<<<<<< HEAD
+from app.routes import activation, billing, calls, events, health, profile, recordings, setup
 import app.routes.events as _events_module
 
 log = structlog.get_logger()
@@ -88,8 +89,8 @@ def create_app() -> FastAPI:
     app.include_router(profile.router, prefix="/api")
     app.include_router(billing.router, prefix="/api")
     app.include_router(setup.router, prefix="/api")
+    app.include_router(activation.router, prefix="/api")
     app.include_router(events.router, prefix="/api")
-    app.include_router(register.router, prefix="/api")
 
     return app
 

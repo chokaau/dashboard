@@ -46,6 +46,9 @@ class AppConfig(BaseSettings):
     # CloudFront origin verify secret (set via Secrets Manager in ECS)
     cloudfront_origin_secret: str = ""
 
+    # SNS alarms topic ARN — used for activation request notifications
+    sns_alarms_topic_arn: str = ""
+
 
 def get_config() -> AppConfig:
     return AppConfig()

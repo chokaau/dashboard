@@ -85,7 +85,7 @@ data "aws_iam_policy_document" "bff_task" {
 }
 
 resource "aws_iam_role_policy" "bff_task" {
-  name   = "s3-tenant-configs"
+  name   = "s3-cognito-tenant-ops"
   role   = aws_iam_role.bff_task.name
   policy = data.aws_iam_policy_document.bff_task.json
 }

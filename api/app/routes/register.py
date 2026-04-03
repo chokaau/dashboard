@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from ruamel.yaml import YAML
 
 from app.dependencies.tenant import UserIdentity, extract_user_identity
+from app.logging_events import TENANT_REGISTERED
 from app.services.slug import make_unique_slug, slugify
 
 log = structlog.get_logger()
@@ -173,17 +174,21 @@ async def register_tenant(
 
         async with session.client("s3", region_name=config.aws_region) as s3:
             try:
+                # NOTE: TOCTOU race exists between slug uniqueness check and Cognito write.
+                # Mitigated by: (a) random suffix makes collisions astronomically unlikely,
+                # (b) S3 PutObject is last-writer-wins, (c) Cognito attributes are per-user.
+                # A distributed lock would add complexity disproportionate to the risk.
                 tenant_slug = await _resolve_slug(s3, bucket, env_short, base_slug)
                 if tenant_slug is None:
                     raise HTTPException(status_code=409, detail="Could not generate unique tenant slug")
-                await _write_billing(s3, bucket, env_short, tenant_slug)
-                await _write_business_yaml(s3, bucket, env_short, tenant_slug, body)
             except HTTPException:
                 raise
             except ClientError as exc:
                 log.error("register_s3_failed", error=str(exc), slug=base_slug)
                 raise HTTPException(status_code=500, detail="Tenant storage initialisation failed")
 
+        # Operation order: Cognito first, then S3. If Cognito fails, no S3 cleanup needed.
+        # If S3 fails after Cognito, writes are idempotent — user can retry.
         try:
             await cognito.admin_update_user_attributes(
                 UserPoolId=pool_id,
@@ -198,8 +203,16 @@ async def register_tenant(
             log.error("register_cognito_update_failed", error=str(exc), user_id=identity.user_id)
             raise HTTPException(status_code=500, detail="Tenant attribute assignment failed")
 
+        async with session.client("s3", region_name=config.aws_region) as s3:
+            try:
+                await _write_billing(s3, bucket, env_short, tenant_slug)
+                await _write_business_yaml(s3, bucket, env_short, tenant_slug, body)
+            except ClientError as exc:
+                log.error("register_s3_failed", error=str(exc), slug=base_slug)
+                raise HTTPException(status_code=500, detail="Tenant storage initialisation failed")
+
     log.info(
-        "tenant_registered",
+        TENANT_REGISTERED,
         user_id=identity.user_id,
         tenant_id=tenant_id,
         tenant_slug=tenant_slug,

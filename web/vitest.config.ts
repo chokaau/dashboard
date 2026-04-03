@@ -41,13 +41,6 @@ export default defineConfig({
   },
   resolve: {
     alias: [
-      // Local dev fallback: resolves @chokaau/ui to storybook source when
-      // the package isn't installed from GitHub Packages. CI installs it
-      // via NODE_AUTH_TOKEN so this alias is unused there.
-      {
-        find: "@chokaau/ui",
-        replacement: resolve(__dirname, "../../storybook/src/index.ts"),
-      },
       { find: /^@\/(.*)/, replacement: resolve(__dirname, "./src/$1") },
     ],
   },

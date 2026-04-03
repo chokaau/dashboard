@@ -63,6 +63,25 @@ data "aws_iam_policy_document" "bff_task" {
       "arn:aws:s3:::${local.tenant_configs_bucket_name}/*",
     ]
   }
+
+  statement {
+    sid     = "WriteTenantRegistration"
+    actions = ["s3:PutObject"]
+    resources = [
+      "arn:aws:s3:::${local.tenant_configs_bucket_name}/*",
+    ]
+  }
+
+  statement {
+    sid     = "CognitoTenantAdmin"
+    actions = [
+      "cognito-idp:AdminGetUser",
+      "cognito-idp:AdminUpdateUserAttributes",
+    ]
+    resources = [
+      local.cognito_user_pool_arn,
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "bff_task" {

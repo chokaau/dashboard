@@ -52,6 +52,8 @@ def extract_user_identity(request: Request) -> UserIdentity:
     if not email:
         raise HTTPException(status_code=403, detail="Email claim missing from token")
     return UserIdentity(user_id=user_id, email=email)
+
+
 _UUID4_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )

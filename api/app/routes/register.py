@@ -86,12 +86,18 @@ async def _slug_exists(s3, bucket: str, key_prefix: str) -> bool:
 
 
 async def _resolve_slug(s3, bucket: str, env_short: str, base_slug: str) -> str:
-    """Return a unique slug, appending a suffix if the base is already taken."""
-    prefix = f"{env_short}/{base_slug}/"
-    if not await _slug_exists(s3, bucket, prefix):
-        return base_slug
-    unique = make_unique_slug(base_slug)
-    return unique
+    """Return a unique slug, appending a random suffix on collision.
+
+    Retries up to 3 times to handle the (unlikely) case where a suffixed
+    slug also collides.  Raises 409 if all attempts are exhausted.
+    """
+    slug = base_slug
+    for attempt in range(3):
+        prefix = f"{env_short}/{slug}/"
+        if not await _slug_exists(s3, bucket, prefix):
+            return slug
+        slug = make_unique_slug(base_slug)
+    raise HTTPException(status_code=409, detail="Could not generate unique tenant slug")
 
 
 async def _write_billing(s3, bucket: str, env_short: str, slug: str) -> None:
@@ -168,10 +174,8 @@ async def register_tenant(
         async with session.client("s3", region_name=config.aws_region) as s3:
             try:
                 tenant_slug = await _resolve_slug(s3, bucket, env_short, base_slug)
-                await _write_billing(s3, bucket, env_short, tenant_slug)
-                await _write_business_yaml(s3, bucket, env_short, tenant_slug, body)
             except ClientError as exc:
-                log.error("register_s3_write_failed", error=str(exc), slug=base_slug)
+                log.error("register_s3_slug_check_failed", error=str(exc), slug=base_slug)
                 raise HTTPException(status_code=500, detail="Tenant storage initialisation failed")
 
         try:
@@ -187,6 +191,14 @@ async def register_tenant(
         except ClientError as exc:
             log.error("register_cognito_update_failed", error=str(exc), user_id=identity.user_id)
             raise HTTPException(status_code=500, detail="Tenant attribute assignment failed")
+
+        async with session.client("s3", region_name=config.aws_region) as s3:
+            try:
+                await _write_billing(s3, bucket, env_short, tenant_slug)
+                await _write_business_yaml(s3, bucket, env_short, tenant_slug, body)
+            except ClientError as exc:
+                log.error("register_s3_write_failed", error=str(exc), slug=tenant_slug)
+                raise HTTPException(status_code=500, detail="Tenant storage initialisation failed")
 
     log.info(
         "tenant_registered",

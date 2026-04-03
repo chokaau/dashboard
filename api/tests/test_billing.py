@@ -163,3 +163,46 @@ def test_billing_paid_plan_rejected(client, auth_headers, app_no_redis):
 
     # Phase 1 only supports "trial" — paid plan should return error
     assert resp.status_code in (422, 500, 400)
+
+
+# ---------------------------------------------------------------------------
+# dashboard-10: activation_status and product fields
+# ---------------------------------------------------------------------------
+
+
+def test_billing_activation_status_returned(client, auth_headers, app_no_redis):
+    """billing.json with activation_status=pending is returned in response."""
+    data = {**_billing_json(), "activation_status": "pending", "product": "voice"}
+    session = _mock_s3_billing(data)
+    with patch("app.routes.billing.aioboto3.Session", return_value=session):
+        resp = client.get("/api/billing", headers=auth_headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["activationStatus"] == "pending"
+    assert body["product"] == "voice"
+
+
+def test_billing_activation_status_defaults_none(client, auth_headers, app_no_redis):
+    """billing.json without activation_status → response has activationStatus=none."""
+    data = _billing_json()  # no activation_status key
+    session = _mock_s3_billing(data)
+    with patch("app.routes.billing.aioboto3.Session", return_value=session):
+        resp = client.get("/api/billing", headers=auth_headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["activationStatus"] == "none"
+    assert body["product"] == ""
+
+
+def test_billing_synthetic_includes_activation_defaults(client, auth_headers, app_no_redis):
+    """Synthetic billing response includes activationStatus=none and product=''."""
+    session = _mock_s3_billing(json_data=None)
+    with patch("app.routes.billing.aioboto3.Session", return_value=session):
+        resp = client.get("/api/billing", headers=auth_headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["activationStatus"] == "none"
+    assert body["product"] == ""

@@ -1,7 +1,10 @@
 /**
- * Tests for story-5-9: SetupPage (Forwarding Setup Wizard).
+ * Tests for ForwardingSetupWizard — moved from story-5-9 SetupPage.
  *
- * TDD: RED tests written first. Tests cover:
+ * The old SetupPage (call-forwarding wizard) is now at /setup/forwarding
+ * via ForwardingSetupWizard.tsx. The /setup route now shows product selection.
+ *
+ * Tests cover:
  * - Step 1: carrier selection renders 4 options
  * - Selecting a carrier enables Next button
  * - Next advances to step 2
@@ -22,20 +25,20 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
   }),
 }));
 
-import { SetupPage } from "@/pages/SetupPage";
+import { ForwardingSetupWizard } from "@/pages/setup/ForwardingSetupWizard";
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/setup"]}>
+    <MemoryRouter initialEntries={["/setup/forwarding"]}>
       <Routes>
-        <Route path="/setup" element={<SetupPage />} />
+        <Route path="/setup/forwarding" element={<ForwardingSetupWizard />} />
         <Route path="/dashboard" element={<div>Dashboard</div>} />
       </Routes>
     </MemoryRouter>
   );
 }
 
-describe("SetupPage", () => {
+describe("ForwardingSetupWizard (formerly SetupPage)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

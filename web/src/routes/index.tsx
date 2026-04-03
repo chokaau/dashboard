@@ -1,8 +1,11 @@
 /**
- * Application routes (story-5-2, updated story-5-3, story-5-10).
+ * Application routes (story-5-2, updated story-5-3, story-5-10, dashboard-10).
  *
  * / → redirect to /dashboard
- * /dashboard, /calls, /calls/:id, /profile, /billing, /setup — protected (AuthGuard)
+ * /dashboard, /calls, /calls/:id, /profile, /billing — protected (AuthGuard)
+ * /setup → product selection page (protected)
+ * /setup/voice → VoiceSetupWizard (protected)
+ * /setup/forwarding → ForwardingSetupWizard (protected, for call-forwarding)
  * /auth/sign-in, /auth/sign-up, /auth/confirm,
  * /auth/forgot-password, /auth/reset-password — public
  */
@@ -22,6 +25,8 @@ const CallDetailPage = lazy(() => import("@/pages/CallDetailPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const BillingPage = lazy(() => import("@/pages/BillingPage"));
 const SetupPage = lazy(() => import("@/pages/SetupPage"));
+const VoiceSetupWizard = lazy(() => import("@/pages/setup/VoiceSetupWizard"));
+const ForwardingSetupWizard = lazy(() => import("@/pages/setup/ForwardingSetupWizard"));
 
 // Auth pages (story-5-3 implementations)
 const SignInPage = lazy(() => import("@/pages/auth/SignInPage"));
@@ -64,6 +69,8 @@ export const router = createBrowserRouter([
           { path: "profile", element: <ProfilePage /> },
           { path: "billing", element: <BillingPage /> },
           { path: "setup", element: <SetupPage /> },
+          { path: "setup/voice", element: <VoiceSetupWizard /> },
+          { path: "setup/forwarding", element: <ForwardingSetupWizard /> },
         ],
       },
       // Public auth routes

@@ -47,6 +47,8 @@ def _compute_response(config: BillingConfig) -> dict[str, Any]:
         "trialDaysRemaining": remaining,
         "trialEndDate": trial_end.date().isoformat(),
         "isTrialExpired": remaining == 0,
+        "activationStatus": config.activation_status,
+        "product": config.product,
     }
 
 
@@ -59,6 +61,8 @@ def _synthetic_response() -> dict[str, Any]:
         "trialDaysRemaining": 14,
         "trialEndDate": end_date,
         "isTrialExpired": False,
+        "activationStatus": "none",
+        "product": "",
     }
 
 

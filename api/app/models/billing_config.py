@@ -1,4 +1,4 @@
-"""BillingConfig Pydantic model — story-4-5.
+"""BillingConfig Pydantic model — story-4-5, dashboard-10.
 
 Phase 1 only supports "trial" plan.
 Reads billing.json from S3.
@@ -20,3 +20,5 @@ class BillingConfig(BaseModel):
     plan: Literal["trial"]
     trial_start: datetime  # timezone-aware
     trial_days: int = 14
+    activation_status: Literal["none", "pending", "active"] = "none"
+    product: str = ""  # "voice" or "" (no product selected yet)

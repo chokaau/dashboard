@@ -51,10 +51,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-
-      - name: Configure npm registry
-        run: echo "@chokaau:registry=https://npm.pkg.github.com" >> .npmrc
-        working-directory: web
+          registry-url: https://npm.pkg.github.com
+          scope: '@chokaau'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -90,10 +88,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-
-      - name: Configure npm registry
-        run: echo "@chokaau:registry=https://npm.pkg.github.com" >> .npmrc
-        working-directory: web
+          registry-url: https://npm.pkg.github.com
+          scope: '@chokaau'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -135,10 +131,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-
-      - name: Configure npm registry
-        run: echo "@chokaau:registry=https://npm.pkg.github.com" >> .npmrc
-        working-directory: web
+          registry-url: https://npm.pkg.github.com
+          scope: '@chokaau'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

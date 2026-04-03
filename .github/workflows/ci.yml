@@ -35,6 +35,7 @@ env:
   AWS_REGION: ap-southeast-2
   NODE_VERSION: "22"
   PNPM_VERSION: "9"
+  TOFU_VERSION: "1.9.0"
 
 jobs:
 
@@ -114,14 +115,65 @@ jobs:
           VITE_API_BASE_URL: /api
 
   # ---------------------------------------------------------------------------
-  # Job 3: build-and-deploy
-  # Runs only on push to main, after both lint-and-typecheck and test pass.
+  # Job 3: infra-outputs
+  # Reads OpenTofu outputs from the infrastructure repo to inject into build.
+  # ---------------------------------------------------------------------------
+  infra-outputs:
+    name: Read Infra Outputs
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      cognito_user_pool_id: ${{ steps.outputs.outputs.cognito_user_pool_id }}
+      cognito_client_id: ${{ steps.outputs.outputs.cognito_client_id }}
+      spa_s3_bucket_name: ${{ steps.outputs.outputs.spa_s3_bucket_name }}
+      cloudfront_distribution_id: ${{ steps.outputs.outputs.cloudfront_distribution_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
+        with:
+          role-to-assume: arn:aws:iam::737923405927:role/choka-deploy-${{ inputs.environment || 'dev' }}
+          aws-region: ap-southeast-2
+
+      - name: Read tofu outputs
+        id: outputs
+        working-directory: infra
+        run: |
+          ENV="${{ inputs.environment || 'dev' }}"
+          tofu init -input=false
+          # Refresh data sources only (safe, read-only)
+          tofu apply -var-file="environments/${ENV}.tfvars" \
+            -refresh-only -auto-approve \
+            > /dev/null 2>&1 || true
+          # Extract outputs
+          if tofu output -json > /tmp/outputs.json 2>/dev/null; then
+            echo "cognito_user_pool_id=$(jq -r '.cognito_user_pool_id.value // empty' /tmp/outputs.json)" >> "$GITHUB_OUTPUT"
+            echo "cognito_client_id=$(jq -r '.cognito_client_id.value // empty' /tmp/outputs.json)" >> "$GITHUB_OUTPUT"
+            echo "spa_s3_bucket_name=$(jq -r '.spa_s3_bucket_name.value // empty' /tmp/outputs.json)" >> "$GITHUB_OUTPUT"
+            echo "cloudfront_distribution_id=$(jq -r '.cloudfront_distribution_id.value // empty' /tmp/outputs.json)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Infra not bootstrapped — outputs unavailable"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 4: build-and-deploy
+  # Runs only on push to main, after lint-and-typecheck, test, and infra-outputs pass.
   # Builds the Vite SPA and deploys to S3 + CloudFront.
   # ---------------------------------------------------------------------------
   build-and-deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test]
+    needs: [lint-and-typecheck, test, infra-outputs]
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     environment: ${{ inputs.environment || 'dev' }}
     permissions:
@@ -162,8 +214,8 @@ jobs:
         run: pnpm build
         env:
           VITE_API_BASE_URL: /api
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
+          VITE_COGNITO_USER_POOL_ID: ${{ needs.infra-outputs.outputs.cognito_user_pool_id || vars.COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ needs.infra-outputs.outputs.cognito_client_id || vars.COGNITO_CLIENT_ID }}
 
       - name: Verify build output
         shell: bash
@@ -200,7 +252,7 @@ jobs:
         shell: bash
         working-directory: web
         env:
-          S3_BUCKET: ${{ vars.DASHBOARD_S3_BUCKET }}
+          S3_BUCKET: ${{ needs.infra-outputs.outputs.spa_s3_bucket_name || vars.DASHBOARD_S3_BUCKET }}
         run: |
           set -euo pipefail
 
@@ -227,7 +279,7 @@ jobs:
       - name: Invalidate CloudFront cache
         shell: bash
         env:
-          DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+          DISTRIBUTION_ID: ${{ needs.infra-outputs.outputs.cloudfront_distribution_id || vars.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
           set -euo pipefail
           INVALIDATION_ID=$(aws cloudfront create-invalidation \
@@ -260,6 +312,6 @@ jobs:
             echo "## Dashboard Deploy Summary"
             echo ""
             echo "**Commit:** \`${GITHUB_SHA::7}\`"
-            echo "**S3 Bucket:** \`${{ vars.DASHBOARD_S3_BUCKET }}\`"
-            echo "**Distribution:** \`${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}\`"
+            echo "**S3 Bucket:** \`${{ needs.infra-outputs.outputs.spa_s3_bucket_name || vars.DASHBOARD_S3_BUCKET }}\`"
+            echo "**Distribution:** \`${{ needs.infra-outputs.outputs.cloudfront_distribution_id || vars.CLOUDFRONT_DISTRIBUTION_ID }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -18,6 +18,7 @@ api/.coverage
 cdocs/
 
 # Coverage
+coverage/
 web/coverage/
 .nyc_output/
 

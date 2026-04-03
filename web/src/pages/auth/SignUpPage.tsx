@@ -12,24 +12,18 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { cognitoSignUp } from "@/adapters/cognito-auth-provider";
+import { validateEmail } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const AU_STATES = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 12;
 
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
-
-function validateEmail(v: string): string {
-  if (!v.trim()) return "Email is required";
-  if (!EMAIL_RE.test(v)) return "Invalid email address";
-  return "";
-}
 
 function validatePassword(v: string): string {
   if (!v) return "Password is required";
@@ -140,10 +134,10 @@ export function SignUpPage() {
     setGlobalError("");
     try {
       await cognitoSignUp(email, password, ownerName);
+      // Store business metadata only — never store password (SEC-CRED-03)
       sessionStorage.setItem("signup_business_name", businessName);
       sessionStorage.setItem("signup_owner_name", ownerName);
       sessionStorage.setItem("signup_state", state);
-      sessionStorage.setItem("signup_password", password);
       navigate(`/auth/confirm?email=${encodeURIComponent(email)}`);
     } catch (err) {
       setGlobalError(mapSignUpError(err));

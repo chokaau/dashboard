@@ -51,10 +51,13 @@ const mockAuthContext = {
 
 const mockCognitoSignUp = vi.fn();
 
+const mockCognitoConfirmSignUp = vi.fn();
+
 vi.mock("@/adapters/cognito-auth-provider", () => ({
   useCognitoAuth: () => mockAuthContext,
   CognitoAuthProvider: ({ children }: { children: React.ReactNode }) => children,
   cognitoSignUp: (...args: unknown[]) => mockCognitoSignUp(...args),
+  cognitoConfirmSignUp: (...args: unknown[]) => mockCognitoConfirmSignUp(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -373,7 +376,8 @@ describe("ConfirmSignUpPage", () => {
       <MemoryRouter initialEntries={[`/auth/confirm?email=${encodeURIComponent(email)}`]}>
         <Routes>
           <Route path="/auth/confirm" element={<ConfirmSignUpPageComponent />} />
-          <Route path="/setup" element={<div>Setup reached</div>} />
+          <Route path="/auth/sign-in" element={<div>SignIn reached</div>} />
+          <Route path="/auth/sign-up" element={<div>SignUp reached</div>} />
         </Routes>
       </MemoryRouter>
     );
@@ -393,9 +397,8 @@ describe("ConfirmSignUpPage", () => {
     });
   });
 
-  it("calls confirmSignUp with email and code", async () => {
-    // No password in sessionStorage — auto-sign-in is skipped, no fetch needed
-    mockConfirmSignUp.mockResolvedValueOnce({ isSignUpComplete: true });
+  it("calls cognitoConfirmSignUp with email and code", async () => {
+    mockCognitoConfirmSignUp.mockResolvedValueOnce(undefined);
 
     renderConfirmPage("user@example.com");
 
@@ -403,54 +406,15 @@ describe("ConfirmSignUpPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
 
     await waitFor(() => {
-      expect(mockConfirmSignUp).toHaveBeenCalledWith({
-        username: "user@example.com",
-        confirmationCode: "123456",
-      });
-    });
-  });
-
-  it("auto-signs-in and calls register when password is in sessionStorage", async () => {
-    sessionStorage.setItem("signup_password", "TestPass123!");
-    sessionStorage.setItem("signup_business_name", "Acme");
-    sessionStorage.setItem("signup_owner_name", "Jane");
-    sessionStorage.setItem("signup_state", "NSW");
-
-    mockConfirmSignUp.mockResolvedValueOnce({ isSignUpComplete: true });
-    mockSignIn.mockResolvedValueOnce({ isSignedIn: true });
-    mockFetchAuthSession.mockResolvedValueOnce({
-      tokens: { idToken: { toString: () => "tok-abc" } },
-    });
-    global.fetch = vi.fn().mockResolvedValueOnce({ ok: true });
-
-    renderConfirmPage("user@example.com");
-
-    await userEvent.type(screen.getByLabelText(/6-digit confirmation code/i), "654321");
-    fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
-
-    await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalledWith({
-        username: "user@example.com",
-        password: "TestPass123!",
-      });
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/auth/register",
-        expect.objectContaining({
-          method: "POST",
-          headers: expect.objectContaining({ Authorization: "Bearer tok-abc" }),
-        })
+      expect(mockCognitoConfirmSignUp).toHaveBeenCalledWith(
+        "user@example.com",
+        "123456"
       );
     });
   });
 
-  it("clears sessionStorage and navigates to /setup on success", async () => {
-    sessionStorage.setItem("signup_password", "TestPass123!");
-    mockConfirmSignUp.mockResolvedValueOnce({ isSignUpComplete: true });
-    mockSignIn.mockResolvedValueOnce({ isSignedIn: true });
-    mockFetchAuthSession.mockResolvedValueOnce({
-      tokens: { idToken: { toString: () => "tok-xyz" } },
-    });
-    global.fetch = vi.fn().mockResolvedValueOnce({ ok: true });
+  it("redirects to /auth/sign-in?verified=true on success (SEC-CRED-03)", async () => {
+    mockCognitoConfirmSignUp.mockResolvedValueOnce(undefined);
 
     renderConfirmPage("user@example.com");
 
@@ -458,13 +422,27 @@ describe("ConfirmSignUpPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Setup reached")).toBeInTheDocument();
-      expect(sessionStorage.getItem("signup_password")).toBeNull();
+      expect(screen.getByText("SignIn reached")).toBeInTheDocument();
     });
   });
 
-  it("shows error when confirmSignUp fails", async () => {
-    mockConfirmSignUp.mockRejectedValueOnce(new Error("Invalid verification code"));
+  it("never stores password in sessionStorage — no signup_password key (SEC-CRED-03)", async () => {
+    mockCognitoConfirmSignUp.mockResolvedValueOnce(undefined);
+
+    renderConfirmPage("user@example.com");
+
+    await userEvent.type(screen.getByLabelText(/6-digit confirmation code/i), "777666");
+    fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("SignIn reached")).toBeInTheDocument();
+    });
+
+    expect(sessionStorage.getItem("signup_password")).toBeNull();
+  });
+
+  it("shows error when cognitoConfirmSignUp fails", async () => {
+    mockCognitoConfirmSignUp.mockRejectedValueOnce(new Error("Invalid verification code"));
 
     renderConfirmPage("user@example.com");
 

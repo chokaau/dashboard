@@ -3,60 +3,14 @@
  *
  * Route: /auth/confirm
  * After successful confirmSignUp:
- *  1. Auto-sign-in using password from sessionStorage
- *  2. POST to /api/auth/register with business metadata
- *  3. Clear sessionStorage
- *  4. Navigate to /setup
+ *  1. Redirects to /auth/sign-in?verified=true (SEC-CRED-03)
+ *  2. Registration completes transparently after sign-in via the auth provider
+ *
+ * Never performs auto-sign-in; password is never stored in sessionStorage.
  */
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { confirmSignUp, signIn as amplifySignIn, fetchAuthSession } from "aws-amplify/auth";
-
-// ---------------------------------------------------------------------------
-// SessionStorage keys (written by SignUpPage)
-// ---------------------------------------------------------------------------
-
-const SS_PASSWORD = "signup_password";
-const SS_BUSINESS_NAME = "signup_business_name";
-const SS_OWNER_NAME = "signup_owner_name";
-const SS_STATE = "signup_state";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function getIdToken(): Promise<string> {
-  const session = await fetchAuthSession();
-  const token = session.tokens?.idToken?.toString();
-  if (!token) throw new Error("No auth token available after sign-in");
-  return token;
-}
-
-async function callRegister(token: string): Promise<void> {
-  const body = {
-    business_name: sessionStorage.getItem(SS_BUSINESS_NAME) ?? "",
-    owner_name: sessionStorage.getItem(SS_OWNER_NAME) ?? "",
-    state: sessionStorage.getItem(SS_STATE) ?? "",
-  };
-  const res = await fetch("/api/auth/register", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw new Error(`Registration failed: ${res.status}`);
-  }
-}
-
-function clearSignupSession(): void {
-  sessionStorage.removeItem(SS_PASSWORD);
-  sessionStorage.removeItem(SS_BUSINESS_NAME);
-  sessionStorage.removeItem(SS_OWNER_NAME);
-  sessionStorage.removeItem(SS_STATE);
-}
+import { cognitoConfirmSignUp } from "@/adapters/cognito-auth-provider";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -78,20 +32,19 @@ export function ConfirmSignUpPage() {
       setError("Please enter the 6-digit confirmation code.");
       return;
     }
+
+    const targetEmail = email.trim();
+    if (!targetEmail) {
+      setError("Registration incomplete. Please sign up again.");
+      navigate("/auth/sign-up", { replace: true });
+      return;
+    }
+
     setSubmitting(true);
     setError("");
     try {
-      await confirmSignUp({ username: email, confirmationCode: code });
-
-      const password = sessionStorage.getItem(SS_PASSWORD) ?? "";
-      if (password) {
-        await amplifySignIn({ username: email, password });
-        const token = await getIdToken();
-        await callRegister(token);
-      }
-
-      clearSignupSession();
-      navigate("/setup", { replace: true });
+      await cognitoConfirmSignUp(targetEmail, code);
+      navigate("/auth/sign-in?verified=true", { replace: true });
     } catch (err) {
       setError((err as Error).message ?? "Confirmation failed. Please try again.");
     } finally {

@@ -11,9 +11,7 @@ Security invariants:
 """
 
 import re
-import uuid
 from dataclasses import dataclass
-from typing import Literal
 
 import structlog
 from fastapi import HTTPException, Request

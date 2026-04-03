@@ -21,9 +21,7 @@ Coverage:
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
-from tests.conftest import TEST_POOL_ID, mint_jwt
+from tests.conftest import mint_jwt
 
 
 # ---------------------------------------------------------------------------

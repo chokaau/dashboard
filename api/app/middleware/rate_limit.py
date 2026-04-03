@@ -35,7 +35,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         tenant_slug = claims.get("custom:tenant_slug", "")
         if not tenant_slug:
-            return await call_next(request)
+            # No tenant yet (e.g. /auth/register) — rate-limit on user sub instead
+            sub = claims.get("sub", "")
+            if not sub:
+                return await call_next(request)
+            tenant_slug = f"__sub__{sub}"
 
         config = request.app.state.config
         is_write = request.method in _WRITE_METHODS

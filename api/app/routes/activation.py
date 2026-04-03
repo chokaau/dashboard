@@ -67,6 +67,14 @@ async def request_activation(
         # Read existing billing.json (or start from defaults)
         existing_data = await _read_billing(s3, bucket, key)
 
+        current_status = existing_data.get("activation_status", "none")
+
+        # Idempotency: already active → 409; already pending → 200
+        if current_status == "active":
+            raise HTTPException(status_code=409, detail="Service already activated")
+        if current_status == "pending":
+            return {"activation_status": "pending"}
+
         # Update activation fields
         existing_data["activation_status"] = "pending"
         existing_data["product"] = "voice"
@@ -79,8 +87,7 @@ async def request_activation(
     owner_name = ""
     state = ""
     try:
-        billing = BillingConfig(**existing_data)
-        _ = billing  # validated
+        BillingConfig(**existing_data)  # validate schema only
     except Exception:
         pass  # non-fatal — proceed with empty notification fields
 

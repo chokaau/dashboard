@@ -6,7 +6,11 @@
  * - Step indicator shows correct current step
  * - Next advances through steps
  * - Back returns to previous step
- * - Step 1 required fields block advancement
+ * - Step 1 required fields block advancement (validation)
+ * - Step 2 required fields block advancement (validation)
+ * - Step 3 required pricing blocks advancement (validation)
+ * - Invalid phone format shows error
+ * - Errors clear when field is filled
  * - Step 4 (ReviewSubmitStep) shows read-only summary and submit button
  * - Submit calls PUT /api/profile + POST /api/activation/request
  * - Submit navigates to /dashboard on success
@@ -57,10 +61,27 @@ const sampleProfile = {
   servicesNotOffered: [],
   serviceAreas: "Melbourne metro area",
   hours: "Mon-Fri 7am-5pm",
-  pricing: "",
+  pricing: "Call-out fee $80",
   faq: "",
   policies: "",
   state: "VIC",
+  setupComplete: false,
+};
+
+/** Profile with all required step-1 fields blank (for validation tests) */
+const emptyProfile = {
+  businessName: "",
+  ownerName: "",
+  receptionistName: "",
+  ownerPhone: "",
+  services: "",
+  servicesNotOffered: [],
+  serviceAreas: "",
+  hours: "",
+  pricing: "",
+  faq: "",
+  policies: "",
+  state: "",
   setupComplete: false,
 };
 
@@ -210,6 +231,125 @@ describe("VoiceSetupWizard", () => {
       expect(putCall).toBeDefined();
       expect(postCall).toBeDefined();
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Validation tests (FIX 1)
+  // ---------------------------------------------------------------------------
+
+  it("Next on step 1 shows errors for blank required fields", async () => {
+    mockApiFetch.mockResolvedValue(emptyProfile);
+    renderWizard();
+    await waitFor(() => expect(screen.getByText(/step 1/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/business name is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/owner name is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/state is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/receptionist name is required/i)).toBeInTheDocument();
+    });
+    // Still on step 1
+    expect(screen.getByText(/step 1/i)).toBeInTheDocument();
+  });
+
+  it("Next on step 1 does not advance when required fields are empty", async () => {
+    mockApiFetch.mockResolvedValue(emptyProfile);
+    renderWizard();
+    await waitFor(() => expect(screen.getByText(/step 1/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    // Should still be on step 1
+    await waitFor(() => expect(screen.queryByText(/step 2/i)).not.toBeInTheDocument());
+  });
+
+  it("Step 1 errors clear when field is filled", async () => {
+    mockApiFetch.mockResolvedValue(emptyProfile);
+    renderWizard();
+    await waitFor(() => expect(screen.getByText(/step 1/i)).toBeInTheDocument());
+
+    // Trigger errors
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/business name is required/i)).toBeInTheDocument()
+    );
+
+    // Fill business name — its error should vanish
+    fireEvent.change(screen.getByRole("textbox", { name: /business name/i }), {
+      target: { value: "Dave's Electrical" },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText(/business name is required/i)).not.toBeInTheDocument()
+    );
+  });
+
+  it("Next on step 2 shows errors for blank required fields", async () => {
+    mockApiFetch.mockResolvedValue(emptyProfile);
+    renderWizard();
+    await waitFor(() => expect(screen.getByText(/step 1/i)).toBeInTheDocument());
+
+    // Fill step 1 required fields and advance
+    fireEvent.change(screen.getByRole("textbox", { name: /business name/i }), { target: { value: "Dave's Electrical" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /owner name/i }), { target: { value: "Dave" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /state/i }), { target: { value: "VIC" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /receptionist/i }), { target: { value: "Choka" } });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => expect(screen.getByText(/step 2/i)).toBeInTheDocument());
+
+    // Now click Next on step 2 with empty fields
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/services offered is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/service areas is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/business hours is required/i)).toBeInTheDocument();
+    });
+    // Still on step 2
+    expect(screen.getByText(/step 2/i)).toBeInTheDocument();
+  });
+
+  it("Next on step 3 shows error when pricing is blank", async () => {
+    mockApiFetch.mockResolvedValue({
+      ...sampleProfile,
+      pricing: "",
+    });
+    renderWizard();
+    await waitFor(() => expect(screen.getByText(/step 1/i)).toBeInTheDocument());
+
+    // Advance to step 3
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => expect(screen.getByText(/step 2/i)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => expect(screen.getByText(/step 3/i)).toBeInTheDocument());
+
+    // Try to advance with blank pricing
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/pricing information is required/i)).toBeInTheDocument()
+    );
+    // Still on step 3
+    expect(screen.getByText(/step 3/i)).toBeInTheDocument();
+  });
+
+  it("shows phone format error for invalid number", async () => {
+    mockApiFetch.mockResolvedValue({ ...emptyProfile, ownerPhone: "12345" });
+    renderWizard();
+    await waitFor(() => expect(screen.getByText(/step 1/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/valid australian number/i)).toBeInTheDocument()
+    );
+  });
+
+  it("phone hint text is shown when phone field has no error", async () => {
+    mockApiFetch.mockResolvedValue(sampleProfile);
+    renderWizard();
+    await waitFor(() => expect(screen.getByText(/step 1/i)).toBeInTheDocument());
+    expect(
+      screen.getByText(/australian format/i)
+    ).toBeInTheDocument();
   });
 
   it("navigates to /dashboard after successful submit", async () => {

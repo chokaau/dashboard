@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
+import { StepHeader } from "@/components/StepHeader";
 
 type Carrier = "telstra" | "optus" | "vodafone" | "other";
 
@@ -30,17 +31,6 @@ const FORWARD_CODES: Record<Carrier, string> = {
 
 const TOTAL_STEPS = 4;
 
-function StepHeader({ step, title }: { step: number; title: string }) {
-  return (
-    <div className="mb-6">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Step {step} of {TOTAL_STEPS}
-      </p>
-      <h1 className="mt-1 text-lg font-semibold text-foreground">{title}</h1>
-    </div>
-  );
-}
-
 function Step1CarrierSelect({
   selected,
   onSelect,
@@ -50,7 +40,7 @@ function Step1CarrierSelect({
 }) {
   return (
     <>
-      <StepHeader step={1} title="Who is your phone provider?" />
+      <StepHeader step={1} totalSteps={TOTAL_STEPS} title="Who is your phone provider?" />
       <div className="grid grid-cols-2 gap-3">
         {CARRIERS.map((c) => (
           <button
@@ -74,7 +64,7 @@ function Step1CarrierSelect({
 function Step2DisableVoicemail({ carrier }: { carrier: Carrier }) {
   return (
     <>
-      <StepHeader step={2} title="First, turn off voicemail" />
+      <StepHeader step={2} totalSteps={TOTAL_STEPS} title="First, turn off voicemail" />
       <p className="mb-4 text-sm text-muted-foreground">
         Before we can answer your calls, voicemail needs to be off.
       </p>
@@ -112,7 +102,7 @@ function Step3ActivateForwarding({ carrier }: { carrier: Carrier }) {
   const code = FORWARD_CODES[carrier];
   return (
     <>
-      <StepHeader step={3} title="Activate call forwarding" />
+      <StepHeader step={3} totalSteps={TOTAL_STEPS} title="Activate call forwarding" />
       <p className="mb-4 text-sm text-muted-foreground">
         Now set your phone to forward unanswered calls to Choka.
       </p>
@@ -149,7 +139,7 @@ function Step3ActivateForwarding({ carrier }: { carrier: Carrier }) {
 function Step4Confirm() {
   return (
     <>
-      <StepHeader step={4} title="You're all set!" />
+      <StepHeader step={4} totalSteps={TOTAL_STEPS} title="You're all set!" />
       <div className="flex flex-col items-center py-6 text-center">
         <CheckCircle className="mb-3 h-12 w-12 text-green-500" />
         <p className="text-sm text-muted-foreground">

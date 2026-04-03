@@ -19,6 +19,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { StepIndicator } from "@/components/StepIndicator";
+import { StepHeader } from "@/components/StepHeader";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,34 +57,70 @@ export interface WizardFormData {
   faq: string;
 }
 
+export type StepErrors = Partial<Record<keyof WizardFormData, string>>;
+
 const TOTAL_STEPS = 4;
 
 // ---------------------------------------------------------------------------
-// Step header
+// Validation
 // ---------------------------------------------------------------------------
 
-function StepHeader({ step, title }: { step: number; title: string }) {
-  return (
-    <div className="mb-6">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Step {step} of {TOTAL_STEPS}
-      </p>
-      <h1 className="mt-1 text-lg font-semibold text-foreground">{title}</h1>
-    </div>
-  );
+/** Australian mobile/landline: starts with 04, 02-09, or +61. Any spacing allowed. */
+const AU_PHONE_RE = /^(\+61|0)[2-9]\d[\d\s]{6,}$/;
+
+function validatePhone(value: string): string | undefined {
+  if (!value.trim()) return undefined; // ownerPhone is not required
+  if (!AU_PHONE_RE.test(value.replace(/\s/g, ""))) {
+    return "Enter a valid Australian number, e.g. 0412 345 678 or +61412345678";
+  }
+  return undefined;
+}
+
+function validateStep1(data: WizardFormData): StepErrors {
+  const errors: StepErrors = {};
+  if (!data.businessName.trim()) errors.businessName = "Business name is required";
+  if (!data.ownerName.trim()) errors.ownerName = "Owner name is required";
+  if (!data.state.trim()) errors.state = "State is required";
+  if (!data.receptionistName.trim()) errors.receptionistName = "Receptionist name is required";
+  const phoneErr = validatePhone(data.ownerPhone);
+  if (phoneErr) errors.ownerPhone = phoneErr;
+  return errors;
+}
+
+function validateStep2(data: WizardFormData): StepErrors {
+  const errors: StepErrors = {};
+  if (!data.services.trim()) errors.services = "Services offered is required";
+  if (!data.serviceAreas.trim()) errors.serviceAreas = "Service areas is required";
+  if (!data.hours.trim()) errors.hours = "Business hours is required";
+  return errors;
+}
+
+function validateStep3(data: WizardFormData): StepErrors {
+  const errors: StepErrors = {};
+  if (!data.pricing.trim()) errors.pricing = "Pricing information is required";
+  return errors;
+}
+
+function validateStep(step: number, data: WizardFormData): StepErrors {
+  if (step === 1) return validateStep1(data);
+  if (step === 2) return validateStep2(data);
+  if (step === 3) return validateStep3(data);
+  return {};
 }
 
 // ---------------------------------------------------------------------------
-// Field components
+// Field component
 // ---------------------------------------------------------------------------
 
 function Field({
   id,
   label,
+  error,
   children,
 }: {
   id: string;
   label: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -92,13 +129,21 @@ function Field({
         {label}
       </label>
       {children}
+      {error && (
+        <p className="text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
 
 const inputClass =
   "w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary";
+const inputErrorClass =
+  "w-full rounded-md border border-destructive bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive";
 const textareaClass = `${inputClass} resize-y`;
+const textareaErrorClass = `${inputErrorClass} resize-y`;
 
 // ---------------------------------------------------------------------------
 // Step 1: Business Details
@@ -106,60 +151,76 @@ const textareaClass = `${inputClass} resize-y`;
 
 interface Step1Props {
   data: WizardFormData;
+  errors: StepErrors;
   onChange: (patch: Partial<WizardFormData>) => void;
 }
 
-function BusinessDetailsStep({ data, onChange }: Step1Props) {
+function BusinessDetailsStep({ data, errors, onChange }: Step1Props) {
   return (
     <>
-      <StepHeader step={1} title="Business details" />
+      <StepHeader step={1} totalSteps={TOTAL_STEPS} title="Business details" />
       <div className="space-y-4">
-        <Field id="businessName" label="Business name">
+        <Field id="businessName" label="Business name" error={errors.businessName}>
           <input
             id="businessName"
             type="text"
             value={data.businessName}
             onChange={(e) => onChange({ businessName: e.target.value })}
-            className={inputClass}
+            className={errors.businessName ? inputErrorClass : inputClass}
+            aria-invalid={!!errors.businessName}
           />
         </Field>
-        <Field id="ownerName" label="Owner name">
+        <Field id="ownerName" label="Owner name" error={errors.ownerName}>
           <input
             id="ownerName"
             type="text"
             value={data.ownerName}
             onChange={(e) => onChange({ ownerName: e.target.value })}
-            className={inputClass}
+            className={errors.ownerName ? inputErrorClass : inputClass}
+            aria-invalid={!!errors.ownerName}
           />
         </Field>
-        <Field id="state" label="State">
+        <Field id="state" label="State" error={errors.state}>
           <input
             id="state"
             type="text"
             value={data.state}
             onChange={(e) => onChange({ state: e.target.value })}
-            className={inputClass}
+            className={errors.state ? inputErrorClass : inputClass}
             placeholder="e.g. VIC"
+            aria-invalid={!!errors.state}
           />
         </Field>
-        <Field id="ownerPhone" label="Phone number (E.164 format, e.g. +61412000001)">
+        <Field
+          id="ownerPhone"
+          label="Phone number"
+          error={errors.ownerPhone}
+        >
           <input
             id="ownerPhone"
             type="tel"
             value={data.ownerPhone}
             onChange={(e) => onChange({ ownerPhone: e.target.value })}
-            className={inputClass}
-            placeholder="+61412000001"
+            className={errors.ownerPhone ? inputErrorClass : inputClass}
+            placeholder="e.g. 0412 345 678"
+            aria-invalid={!!errors.ownerPhone}
+            aria-describedby="ownerPhone-hint"
           />
+          {!errors.ownerPhone && (
+            <p id="ownerPhone-hint" className="text-xs text-muted-foreground">
+              Australian format, e.g. 0412 345 678 or +61412345678
+            </p>
+          )}
         </Field>
-        <Field id="receptionistName" label="What should your AI receptionist be called?">
+        <Field id="receptionistName" label="What should your AI receptionist be called?" error={errors.receptionistName}>
           <input
             id="receptionistName"
             type="text"
             value={data.receptionistName}
             onChange={(e) => onChange({ receptionistName: e.target.value })}
-            className={inputClass}
+            className={errors.receptionistName ? inputErrorClass : inputClass}
             placeholder="e.g. Choka"
+            aria-invalid={!!errors.receptionistName}
           />
         </Field>
       </div>
@@ -173,22 +234,24 @@ function BusinessDetailsStep({ data, onChange }: Step1Props) {
 
 interface Step2Props {
   data: WizardFormData;
+  errors: StepErrors;
   onChange: (patch: Partial<WizardFormData>) => void;
 }
 
-function ServicesHoursStep({ data, onChange }: Step2Props) {
+function ServicesHoursStep({ data, errors, onChange }: Step2Props) {
   return (
     <>
-      <StepHeader step={2} title="Services & hours" />
+      <StepHeader step={2} totalSteps={TOTAL_STEPS} title="Services & hours" />
       <div className="space-y-4">
-        <Field id="services" label="Services offered">
+        <Field id="services" label="Services offered" error={errors.services}>
           <textarea
             id="services"
             rows={3}
             value={data.services}
             onChange={(e) => onChange({ services: e.target.value })}
-            className={textareaClass}
+            className={errors.services ? textareaErrorClass : textareaClass}
             placeholder="Describe the services your business offers"
+            aria-invalid={!!errors.services}
           />
         </Field>
         <Field id="servicesNotOffered" label="Services NOT offered (comma-separated)">
@@ -201,24 +264,26 @@ function ServicesHoursStep({ data, onChange }: Step2Props) {
             placeholder="e.g. Solar panels, Air conditioning"
           />
         </Field>
-        <Field id="serviceAreas" label="Service areas">
+        <Field id="serviceAreas" label="Service areas" error={errors.serviceAreas}>
           <textarea
             id="serviceAreas"
             rows={2}
             value={data.serviceAreas}
             onChange={(e) => onChange({ serviceAreas: e.target.value })}
-            className={textareaClass}
+            className={errors.serviceAreas ? textareaErrorClass : textareaClass}
             placeholder="e.g. Melbourne metro and surrounding suburbs"
+            aria-invalid={!!errors.serviceAreas}
           />
         </Field>
-        <Field id="hours" label="Business hours">
+        <Field id="hours" label="Business hours" error={errors.hours}>
           <textarea
             id="hours"
             rows={2}
             value={data.hours}
             onChange={(e) => onChange({ hours: e.target.value })}
-            className={textareaClass}
+            className={errors.hours ? textareaErrorClass : textareaClass}
             placeholder="e.g. Mon-Fri 7am-5pm, Sat 8am-12pm"
+            aria-invalid={!!errors.hours}
           />
         </Field>
       </div>
@@ -232,22 +297,24 @@ function ServicesHoursStep({ data, onChange }: Step2Props) {
 
 interface Step3Props {
   data: WizardFormData;
+  errors: StepErrors;
   onChange: (patch: Partial<WizardFormData>) => void;
 }
 
-function PricingPoliciesStep({ data, onChange }: Step3Props) {
+function PricingPoliciesStep({ data, errors, onChange }: Step3Props) {
   return (
     <>
-      <StepHeader step={3} title="Pricing & policies" />
+      <StepHeader step={3} totalSteps={TOTAL_STEPS} title="Pricing & policies" />
       <div className="space-y-4">
-        <Field id="pricing" label="Pricing information">
+        <Field id="pricing" label="Pricing information" error={errors.pricing}>
           <textarea
             id="pricing"
             rows={3}
             value={data.pricing}
             onChange={(e) => onChange({ pricing: e.target.value })}
-            className={textareaClass}
+            className={errors.pricing ? textareaErrorClass : textareaClass}
             placeholder="Describe your pricing or call-out fees"
+            aria-invalid={!!errors.pricing}
           />
         </Field>
         <Field id="policies" label="Policies (optional)">
@@ -279,12 +346,12 @@ function PricingPoliciesStep({ data, onChange }: Step3Props) {
 // Step 4: Review & Submit
 // ---------------------------------------------------------------------------
 
-interface ReviewRow {
+interface ReviewRowProps {
   label: string;
   value: string;
 }
 
-function ReviewRow({ label, value }: ReviewRow) {
+function ReviewRow({ label, value }: ReviewRowProps) {
   return (
     <div className="flex flex-col gap-0.5 border-b border-border py-2 last:border-0">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
@@ -303,7 +370,7 @@ interface Step4Props {
 function ReviewSubmitStep({ data, onSubmit, isSubmitting, submitError }: Step4Props) {
   return (
     <>
-      <StepHeader step={4} title="Review your details" />
+      <StepHeader step={4} totalSteps={TOTAL_STEPS} title="Review your details" />
       <div className="space-y-0">
         <ReviewRow label="Business name" value={data.businessName} />
         <ReviewRow label="Owner name" value={data.ownerName} />
@@ -392,6 +459,7 @@ export function VoiceSetupWizard() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<WizardFormData>(emptyForm);
+  const [stepErrors, setStepErrors] = useState<StepErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [initialised, setInitialised] = useState(false);
 
@@ -426,13 +494,28 @@ export function VoiceSetupWizard() {
 
   const handleChange = (patch: Partial<WizardFormData>) => {
     setFormData((prev) => ({ ...prev, ...patch }));
+    // Clear errors for changed fields
+    setStepErrors((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(patch) as (keyof WizardFormData)[]) {
+        delete next[key];
+      }
+      return next;
+    });
   };
 
   const handleNext = () => {
+    const errors = validateStep(step, formData);
+    if (Object.keys(errors).length > 0) {
+      setStepErrors(errors);
+      return;
+    }
+    setStepErrors({});
     if (step < TOTAL_STEPS) setStep((s) => s + 1);
   };
 
   const handleBack = () => {
+    setStepErrors({});
     if (step > 1) setStep((s) => s - 1);
   };
 
@@ -473,13 +556,13 @@ export function VoiceSetupWizard() {
       {/* Step content */}
       <div className="min-h-64">
         {step === 1 && (
-          <BusinessDetailsStep data={formData} onChange={handleChange} />
+          <BusinessDetailsStep data={formData} errors={stepErrors} onChange={handleChange} />
         )}
         {step === 2 && (
-          <ServicesHoursStep data={formData} onChange={handleChange} />
+          <ServicesHoursStep data={formData} errors={stepErrors} onChange={handleChange} />
         )}
         {step === 3 && (
-          <PricingPoliciesStep data={formData} onChange={handleChange} />
+          <PricingPoliciesStep data={formData} errors={stepErrors} onChange={handleChange} />
         )}
         {step === 4 && (
           <ReviewSubmitStep

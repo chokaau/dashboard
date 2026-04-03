@@ -28,3 +28,6 @@ RECORDING_STREAM_INTERRUPTED = "recording_stream_interrupted"
 
 # Health
 DEPENDENCY_HEALTH_CHECK_FAILED = "dependency_health_check_failed"
+
+# Registration
+TENANT_REGISTERED = "tenant_registered"

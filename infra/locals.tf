@@ -9,8 +9,9 @@ locals {
   # ---------------------------------------------------------------------------
   # Cognito — from management layer
   # ---------------------------------------------------------------------------
-  cognito_user_pool_id = data.terraform_remote_state.management.outputs.cognito_user_pool_ids[var.env_short]
-  cognito_client_id    = data.terraform_remote_state.management.outputs.cognito_client_ids[var.env_short]
+  cognito_user_pool_id  = data.terraform_remote_state.management.outputs.cognito_user_pool_ids[var.env_short]
+  cognito_client_id     = data.terraform_remote_state.management.outputs.cognito_client_ids[var.env_short]
+  cognito_user_pool_arn = "arn:aws:cognito-idp:${var.aws_region}:${data.aws_caller_identity.current.account_id}:userpool/${local.cognito_user_pool_id}"
 
   # ---------------------------------------------------------------------------
   # Networking — from networking layer

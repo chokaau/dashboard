@@ -11,9 +11,7 @@ Security invariants:
 """
 
 import re
-import uuid
 from dataclasses import dataclass
-from typing import Literal
 
 import structlog
 from fastapi import HTTPException, Request
@@ -23,6 +21,37 @@ from app.logging_events import UNKNOWN_ROLE_DEFAULTED
 log = structlog.get_logger()
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{0,61}[a-z0-9]$")
+
+
+# ---------------------------------------------------------------------------
+# Lightweight identity — no tenant claims required (used by register endpoint)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class UserIdentity:
+    """Minimal identity from JWT — no tenant required."""
+
+    user_id: str  # Cognito sub
+    email: str
+
+
+def extract_user_identity(request: Request) -> UserIdentity:
+    """Extract user identity from JWT without requiring tenant claims.
+
+    Raises 401 if sub is absent; 403 if email is absent.
+    Used by the register endpoint only.
+    """
+    claims: dict = getattr(request.state, "jwt_claims", {})
+    user_id = claims.get("sub") or ""
+    email = claims.get("email") or ""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if not email:
+        raise HTTPException(status_code=403, detail="Email claim missing from token")
+    return UserIdentity(user_id=user_id, email=email)
+
+
 _UUID4_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )

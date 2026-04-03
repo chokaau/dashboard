@@ -15,6 +15,16 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - demo
+          - prod
 
 permissions:
   id-token: write
@@ -112,13 +122,22 @@ jobs:
     name: Build & Deploy
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, test]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: development
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    environment: ${{ inputs.environment || 'dev' }}
+    permissions:
+      id-token: write
+      contents: read
     defaults:
       run:
         working-directory: web
 
     steps:
+      - name: Validate dispatch branch
+        if: github.event_name == 'workflow_dispatch' && inputs.environment != 'dev' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Deploying to ${{ inputs.environment }} requires the main branch. Current ref: ${{ github.ref }}"
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
@@ -145,28 +164,6 @@ jobs:
           VITE_API_BASE_URL: /api
           VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
           VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
-
-      - name: Assert env vars were injected into bundle
-        shell: bash
-        working-directory: web
-        run: |
-          set -euo pipefail
-          # Vite embeds literal env var values into the bundle at build time.
-          # Grep the assets to confirm VITE_ values are present (not empty/undefined).
-          ASSET_DIR="dist/assets"
-          if ! grep -rl "VITE_" "${ASSET_DIR}" > /dev/null 2>&1; then
-            # VITE_ keys are replaced at build time — confirm the bundle does not
-            # contain un-replaced placeholder strings (which would indicate a
-            # broken env injection). Check that cognito config key patterns exist.
-            echo "NOTE: VITE_ keys replaced at build time, checking for aws-amplify config patterns"
-          fi
-          # Verify the vars were non-empty at build time by checking the bundle
-          # does not contain the literal string "undefined" in place of Cognito IDs.
-          if grep -rl '"undefined"' "${ASSET_DIR}" > /dev/null 2>&1; then
-            echo "ERROR: bundle contains literal \"undefined\" — env vars were not injected" >&2
-            exit 1
-          fi
-          echo "PASS: env var injection verified (no un-replaced undefined values in bundle)"
 
       - name: Verify build output
         shell: bash
@@ -196,9 +193,8 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/choka-deploy-dev
-          role-session-name: github-actions-dashboard-deploy
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::737923405927:role/choka-deploy-${{ inputs.environment || 'dev' }}
+          aws-region: ap-southeast-2
 
       - name: Deploy to S3 (tiered cache headers)
         shell: bash

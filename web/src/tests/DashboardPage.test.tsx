@@ -8,7 +8,7 @@
  * - Shows PageError on query error with refetch button
  * - CallCard onClick navigates to /calls/{id}
  *
- * NOTE: @choka/ui components are mocked to avoid cross-package bundler
+ * NOTE: @chokaau/ui components are mocked to avoid cross-package bundler
  * complexity in unit tests. Integration tests cover the full render.
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -17,7 +17,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // ---------------------------------------------------------------------------
-// Mock @choka/ui components (avoids cross-package bundler issues in unit tests)
+// Mock @chokaau/ui components (avoids cross-package bundler issues in unit tests)
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 
 import { DashboardPage } from "@/pages/DashboardPage";
 
-vi.mock("@choka/ui", () => ({
+vi.mock("@chokaau/ui", () => ({
 DashboardStatCard: ({
     label,
     value,

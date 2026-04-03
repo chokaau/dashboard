@@ -15,7 +15,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // ---------------------------------------------------------------------------
-// Mock @choka/ui components
+// Mock @chokaau/ui components
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 
 import { CallHistoryPage } from "@/pages/CallHistoryPage";
 
-vi.mock("@choka/ui", () => ({
+vi.mock("@chokaau/ui", () => ({
 CallHistoryFilterBar: ({
     activeTab,
     onTabChange,

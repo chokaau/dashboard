@@ -11,8 +11,8 @@ import { PhoneOff } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useCallHistoryFilters } from "@/stores/call-history-filters";
 import type { CallHistoryStatus, CallHistoryDateRange } from "@/stores/call-history-filters";
-import { CallCard, CallHistoryFilterBar, EmptyState, Skeleton } from "@choka/ui";
-import type { CallCardProps, CallHistoryTab, DateFilter, LeadIntent } from "@choka/ui";
+import { CallCard, CallHistoryFilterBar, EmptyState, Skeleton } from "@chokaau/ui";
+import type { CallCardProps, CallHistoryTab, DateFilter, LeadIntent } from "@chokaau/ui";
 
 // ---------------------------------------------------------------------------
 // Types

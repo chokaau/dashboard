@@ -19,8 +19,7 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@choka/ui": ["../../storybook/src/index.ts"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src"],

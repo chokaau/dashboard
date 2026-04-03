@@ -35,7 +35,7 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 
 import { ProfilePage } from "@/pages/ProfilePage";
 
-vi.mock("@choka/ui", () => ({
+vi.mock("@chokaau/ui", () => ({
 Skeleton: ({ className }: { className?: string }) => (
     <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
   ),

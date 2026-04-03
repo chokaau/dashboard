@@ -10,8 +10,8 @@ import { useNavigate } from "react-router-dom";
 import { useCallEvents } from "@/hooks/use-call-events";
 import { Phone, PhoneCall, PhoneOff, Clock } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { CallCard, DashboardStatCard, NeedsCallbackPanel, PageError } from "@choka/ui";
-import type { CallCardProps, CallbackLead, LeadIntent } from "@choka/ui";
+import { CallCard, DashboardStatCard, NeedsCallbackPanel, PageError } from "@chokaau/ui";
+import type { CallCardProps, CallbackLead, LeadIntent } from "@chokaau/ui";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors BFF response)

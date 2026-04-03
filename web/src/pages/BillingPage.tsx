@@ -7,7 +7,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { Skeleton } from "@choka/ui";
+import { Skeleton } from "@chokaau/ui";
 
 // ---------------------------------------------------------------------------
 // Types

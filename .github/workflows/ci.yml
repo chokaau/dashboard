@@ -51,8 +51,14 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
+      - name: Configure npm registry
+        run: echo "@chokaau:registry=https://npm.pkg.github.com" >> .npmrc
+        working-directory: web
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Lint (eslint)
         run: pnpm lint
@@ -84,8 +90,14 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
+      - name: Configure npm registry
+        run: echo "@chokaau:registry=https://npm.pkg.github.com" >> .npmrc
+        working-directory: web
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests with coverage
         run: pnpm test
@@ -123,8 +135,14 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
+      - name: Configure npm registry
+        run: echo "@chokaau:registry=https://npm.pkg.github.com" >> .npmrc
+        working-directory: web
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: pnpm build

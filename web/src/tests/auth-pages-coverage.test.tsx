@@ -22,13 +22,32 @@ vi.mock("aws-amplify/auth", () => ({
   resetPassword: vi.fn(),
   confirmResetPassword: vi.fn(),
   signOut: vi.fn(),
+  fetchAuthSession: vi.fn(),
+  signUp: vi.fn(),
+}));
+
+// Mock auth provider adapter exports
+vi.mock("@/adapters/cognito-auth-provider", () => ({
+  useCognitoAuth: () => ({
+    isLoaded: true,
+    isAuthenticated: false,
+    user: null,
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+    getAccessToken: vi.fn(),
+  }),
+  CognitoAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  cognitoSignUp: vi.fn(),
+  cognitoConfirmSignUp: vi.fn(),
 }));
 
 import * as amplifyAuth from "aws-amplify/auth";
+import * as authProvider from "@/adapters/cognito-auth-provider";
 
 // Typed refs grabbed after mock is established
-const mockConfirmSignUp = vi.mocked(amplifyAuth.confirmSignUp);
 const mockConfirmResetPassword = vi.mocked(amplifyAuth.confirmResetPassword);
+const mockCognitoSignUp = vi.mocked(authProvider.cognitoSignUp);
+const mockCognitoConfirmSignUp = vi.mocked(authProvider.cognitoConfirmSignUp);
 
 // ---------------------------------------------------------------------------
 // SignUpPage
@@ -48,9 +67,13 @@ function renderSignUp() {
 }
 
 describe("SignUpPage", () => {
-  it("shows invitation-only message", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders the signup form", () => {
     renderSignUp();
-    expect(screen.getByText(/invitation only/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create account/i })).toBeInTheDocument();
   });
 
   it("shows a link to sign in", () => {
@@ -72,8 +95,8 @@ function renderConfirm(search = "?email=owner@example.com") {
     <MemoryRouter initialEntries={[`/auth/confirm${search}`]}>
       <Routes>
         <Route path="/auth/confirm" element={<ConfirmSignUpPage />} />
-        <Route path="/setup" element={<div>Setup</div>} />
         <Route path="/auth/sign-in" element={<div>SignIn</div>} />
+        <Route path="/auth/sign-up" element={<div>SignUp</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -81,7 +104,8 @@ function renderConfirm(search = "?email=owner@example.com") {
 
 describe("ConfirmSignUpPage", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    sessionStorage.clear();
   });
 
   it("shows validation error when code length is not 6 digits", async () => {
@@ -95,8 +119,8 @@ describe("ConfirmSignUpPage", () => {
     });
   });
 
-  it("calls confirmSignUp with correct args on valid 6-digit code", async () => {
-    mockConfirmSignUp.mockResolvedValueOnce({});
+  it("calls cognitoConfirmSignUp with correct args on valid 6-digit code", async () => {
+    mockCognitoConfirmSignUp.mockResolvedValueOnce(undefined);
     renderConfirm();
 
     const input = screen.getByLabelText(/6-digit confirmation code/i);
@@ -104,15 +128,15 @@ describe("ConfirmSignUpPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
 
     await waitFor(() => {
-      expect(mockConfirmSignUp).toHaveBeenCalledWith({
-        username: "owner@example.com",
-        confirmationCode: "123456",
-      });
+      expect(mockCognitoConfirmSignUp).toHaveBeenCalledWith(
+        "owner@example.com",
+        "123456"
+      );
     });
   });
 
-  it("navigates to /setup on success", async () => {
-    mockConfirmSignUp.mockResolvedValueOnce({});
+  it("navigates to /auth/sign-in?verified=true on success", async () => {
+    mockCognitoConfirmSignUp.mockResolvedValueOnce(undefined);
     renderConfirm();
 
     const input = screen.getByLabelText(/6-digit confirmation code/i);
@@ -120,12 +144,12 @@ describe("ConfirmSignUpPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Setup")).toBeInTheDocument();
+      expect(screen.getByText("SignIn")).toBeInTheDocument();
     });
   });
 
-  it("shows error message on confirmSignUp failure", async () => {
-    mockConfirmSignUp.mockRejectedValueOnce(new Error("Invalid code"));
+  it("shows error message on cognitoConfirmSignUp failure", async () => {
+    mockCognitoConfirmSignUp.mockRejectedValueOnce(new Error("Invalid code"));
     renderConfirm();
 
     fireEvent.change(screen.getByLabelText(/6-digit confirmation code/i), {

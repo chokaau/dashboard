@@ -4,21 +4,14 @@
  * story-5-3
  */
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { confirmSignIn } from "aws-amplify/auth";
 import { useCognitoAuth } from "@/adapters/cognito-auth-provider";
+import { validateEmail } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // Validation helpers
 // ---------------------------------------------------------------------------
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function validateEmail(value: string): string {
-  if (!value.trim()) return "Email is required";
-  if (!EMAIL_RE.test(value)) return "Invalid email address";
-  return "";
-}
 
 function validatePassword(value: string): string {
   if (!value) return "Password is required";
@@ -40,6 +33,8 @@ type Step =
 
 export function SignInPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isVerified = searchParams.get("verified") === "true";
   const { signIn } = useCognitoAuth();
 
   // Credentials step
@@ -265,6 +260,12 @@ export function SignInPage() {
           </p>
         </div>
 
+        {isVerified && (
+          <p role="status" className="rounded-md border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400">
+            Email verified! Sign in to complete your account setup.
+          </p>
+        )}
+
         {globalError && (
           <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             {globalError}
@@ -339,6 +340,16 @@ export function SignInPage() {
             Forgot password?
           </a>
         </div>
+
+        <p className="text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link
+            to="/auth/sign-up"
+            className="text-primary underline underline-offset-2 hover:no-underline"
+          >
+            Sign up
+          </Link>
+        </p>
       </div>
     </main>
   );

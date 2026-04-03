@@ -15,10 +15,12 @@ import React, {
 } from "react";
 import { Amplify } from "aws-amplify";
 import {
+  confirmSignUp as authConfirmSignUp,
   fetchAuthSession,
   getCurrentUser,
   signIn as amplifySignIn,
   signOut as amplifySignOut,
+  signUp as amplifySignUp,
 } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
 import { ConfigurationError } from "@/components/error-boundaries/ConfigurationError";
@@ -102,6 +104,80 @@ export function CognitoAuthProvider({ children }: CognitoAuthProviderProps) {
   return <CognitoAuthProviderInner>{children}</CognitoAuthProviderInner>;
 }
 
+// ---------------------------------------------------------------------------
+// Stand-alone signUp helper (used by SignUpPage without context)
+// ---------------------------------------------------------------------------
+
+/**
+ * Registers a new Cognito user. Throws on failure; callers handle errors.
+ */
+export async function cognitoSignUp(
+  email: string,
+  password: string,
+  name: string
+): Promise<void> {
+  await amplifySignUp({
+    username: email,
+    password,
+    options: { userAttributes: { email, name } },
+  });
+}
+
+/**
+ * Confirms a Cognito sign-up with a verification code (GEN-ARCH-01).
+ * Wraps Amplify directly so callers never import from aws-amplify/auth.
+ */
+export async function cognitoConfirmSignUp(
+  email: string,
+  code: string
+): Promise<void> {
+  await authConfirmSignUp({ username: email, confirmationCode: code });
+}
+
+// ---------------------------------------------------------------------------
+// Pending registration helpers (SEC-CRED-03)
+//
+// After email verification, the user signs in normally. If sessionStorage
+// holds pending business registration data (but never a password), the
+// sign-in flow calls POST /api/auth/register and clears the data.
+// ---------------------------------------------------------------------------
+
+const SS_BUSINESS_NAME = "signup_business_name";
+const SS_OWNER_NAME = "signup_owner_name";
+const SS_STATE = "signup_state";
+
+/**
+ * Returns true if pending registration data is present in sessionStorage.
+ */
+export function hasPendingRegistration(): boolean {
+  return !!sessionStorage.getItem(SS_BUSINESS_NAME);
+}
+
+/**
+ * Reads pending registration data from sessionStorage.
+ * Returns null if any required field is missing (GEN-ERR-01).
+ */
+export function readPendingRegistration(): {
+  business_name: string;
+  owner_name: string;
+  state: string;
+} | null {
+  const business_name = sessionStorage.getItem(SS_BUSINESS_NAME);
+  const owner_name = sessionStorage.getItem(SS_OWNER_NAME);
+  const state = sessionStorage.getItem(SS_STATE);
+  if (!business_name || !owner_name || !state) return null;
+  return { business_name, owner_name, state };
+}
+
+/**
+ * Clears all pending registration data from sessionStorage.
+ */
+export function clearPendingRegistration(): void {
+  sessionStorage.removeItem(SS_BUSINESS_NAME);
+  sessionStorage.removeItem(SS_OWNER_NAME);
+  sessionStorage.removeItem(SS_STATE);
+}
+
 function CognitoAuthProviderInner({ children }: CognitoAuthProviderProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -159,8 +235,30 @@ function CognitoAuthProviderInner({ children }: CognitoAuthProviderProps) {
 
   const signIn = useCallback(
     async (username: string, password: string) => {
-      await amplifySignIn({ username, password });
+      const result = await amplifySignIn({ username, password });
+
+      // After sign-in, complete registration if pending data exists (SEC-CRED-03)
+      if (hasPendingRegistration()) {
+        const pending = readPendingRegistration();
+        if (pending) {
+          const session = await fetchAuthSession();
+          const token = session.tokens?.idToken?.toString();
+          if (token) {
+            await fetch("/api/auth/register", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(pending),
+            });
+          }
+          clearPendingRegistration();
+        }
+      }
+
       await loadSession();
+      return result;
     },
     [loadSession]
   );

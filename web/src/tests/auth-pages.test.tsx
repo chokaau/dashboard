@@ -25,6 +25,8 @@ const mockConfirmSignUp = vi.fn();
 const mockResetPassword = vi.fn();
 const mockConfirmResetPassword = vi.fn();
 const mockSignOut = vi.fn();
+const mockFetchAuthSession = vi.fn();
+const mockSignUp = vi.fn();
 
 vi.mock("aws-amplify/auth", () => ({
   signIn: mockSignIn,
@@ -33,6 +35,8 @@ vi.mock("aws-amplify/auth", () => ({
   resetPassword: mockResetPassword,
   confirmResetPassword: mockConfirmResetPassword,
   signOut: mockSignOut,
+  fetchAuthSession: mockFetchAuthSession,
+  signUp: mockSignUp,
 }));
 
 // Mock the auth context — default unauthenticated
@@ -45,9 +49,15 @@ const mockAuthContext = {
   getAccessToken: vi.fn(),
 };
 
+const mockCognitoSignUp = vi.fn();
+
+const mockCognitoConfirmSignUp = vi.fn();
+
 vi.mock("@/adapters/cognito-auth-provider", () => ({
   useCognitoAuth: () => mockAuthContext,
   CognitoAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  cognitoSignUp: (...args: unknown[]) => mockCognitoSignUp(...args),
+  cognitoConfirmSignUp: (...args: unknown[]) => mockCognitoConfirmSignUp(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -59,7 +69,7 @@ function renderWithRouter(ui: React.ReactElement, initialPath = "/auth/sign-in")
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/auth/sign-in" element={ui} />
-        <Route path="/auth/sign-up" element={<div>SignUpPage</div>} />
+        <Route path="/auth/sign-up" element={ui} />
         <Route path="/auth/confirm" element={<div>ConfirmPage</div>} />
         <Route path="/auth/forgot-password" element={<div>ForgotPasswordPage</div>} />
         <Route path="/auth/reset-password" element={<div>ResetPasswordPage</div>} />
@@ -69,6 +79,22 @@ function renderWithRouter(ui: React.ReactElement, initialPath = "/auth/sign-in")
     </MemoryRouter>
   );
 }
+
+function renderSignUpWithRouter() {
+  return render(
+    <MemoryRouter initialEntries={["/auth/sign-up"]}>
+      <Routes>
+        <Route path="/auth/sign-up" element={<SignUpPageComponent />} />
+        <Route path="/auth/sign-in" element={<div>SignInPage</div>} />
+        <Route path="/auth/confirm" element={<div>ConfirmPage</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+// Lazy component refs for SignUpPage and ConfirmSignUpPage
+let SignUpPageComponent: React.ComponentType;
+let ConfirmSignUpPageComponent: React.ComponentType;
 
 // ---------------------------------------------------------------------------
 // SignInPage tests
@@ -161,6 +187,14 @@ describe("SignInPage", () => {
     });
   });
 
+  it("shows a Sign up link pointing to /auth/sign-up", async () => {
+    const { SignInPage } = await import("@/pages/auth/SignInPage");
+    renderWithRouter(<SignInPage />);
+    const link = screen.getByRole("link", { name: /sign up/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/auth/sign-up");
+  });
+
   it("shows inline error when TOTP code is incorrect (NotAuthorizedException)", async () => {
     // First call: signIn succeeds with TOTP challenge
     mockAuthContext.signIn.mockResolvedValueOnce({
@@ -206,16 +240,218 @@ describe("SignInPage", () => {
 // ---------------------------------------------------------------------------
 
 describe("SignUpPage", () => {
-  it("shows invitation-only message", async () => {
-    const { SignUpPage } = await import("@/pages/auth/SignUpPage");
-    render(
-      <MemoryRouter>
-        <SignUpPage />
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const mod = await import("@/pages/auth/SignUpPage");
+    SignUpPageComponent = mod.SignUpPage;
+  });
+
+  it("renders all required form fields", () => {
+    renderSignUpWithRouter();
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/owner name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/state/i)).toBeInTheDocument();
+  });
+
+  it("shows validation errors when form is submitted empty", async () => {
+    renderSignUpWithRouter();
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/email is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/password is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/business name is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/owner name is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/state is required/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows password length error when password is too short", async () => {
+    renderSignUpWithRouter();
+    await userEvent.type(screen.getByLabelText(/^password$/i), "short");
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/at least 12 characters/i)).toBeInTheDocument();
+    });
+  });
+
+  it("calls cognitoSignUp with email, password, ownerName on valid submit", async () => {
+    mockCognitoSignUp.mockResolvedValueOnce(undefined);
+    renderSignUpWithRouter();
+
+    await userEvent.type(screen.getByLabelText(/email/i), "owner@example.com");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "SecureP@ss123!");
+    await userEvent.type(screen.getByLabelText(/business name/i), "Acme Co");
+    await userEvent.type(screen.getByLabelText(/owner name/i), "Jane Smith");
+    await userEvent.selectOptions(screen.getByLabelText(/state/i), "NSW");
+
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(mockCognitoSignUp).toHaveBeenCalledWith(
+        "owner@example.com",
+        "SecureP@ss123!",
+        "Jane Smith"
+      );
+    });
+  });
+
+  it("navigates to /auth/confirm after successful signup", async () => {
+    mockCognitoSignUp.mockResolvedValueOnce(undefined);
+    renderSignUpWithRouter();
+
+    await userEvent.type(screen.getByLabelText(/email/i), "owner@example.com");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "SecureP@ss123!");
+    await userEvent.type(screen.getByLabelText(/business name/i), "Acme Co");
+    await userEvent.type(screen.getByLabelText(/owner name/i), "Jane Smith");
+    await userEvent.selectOptions(screen.getByLabelText(/state/i), "VIC");
+
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("ConfirmPage")).toBeInTheDocument();
+    });
+  });
+
+  it("shows UsernameExistsException error message", async () => {
+    const err = Object.assign(new Error("User already exists"), {
+      name: "UsernameExistsException",
+    });
+    mockCognitoSignUp.mockRejectedValueOnce(err);
+    renderSignUpWithRouter();
+
+    await userEvent.type(screen.getByLabelText(/email/i), "exists@example.com");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "SecureP@ss123!");
+    await userEvent.type(screen.getByLabelText(/business name/i), "Acme Co");
+    await userEvent.type(screen.getByLabelText(/owner name/i), "Jane Smith");
+    await userEvent.selectOptions(screen.getByLabelText(/state/i), "QLD");
+
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/account with this email already exists/i)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows InvalidPasswordException error message", async () => {
+    const err = Object.assign(new Error("Password does not conform to policy"), {
+      name: "InvalidPasswordException",
+    });
+    mockCognitoSignUp.mockRejectedValueOnce(err);
+    renderSignUpWithRouter();
+
+    await userEvent.type(screen.getByLabelText(/email/i), "owner@example.com");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "SecureP@ss123!");
+    await userEvent.type(screen.getByLabelText(/business name/i), "Acme Co");
+    await userEvent.type(screen.getByLabelText(/owner name/i), "Jane Smith");
+    await userEvent.selectOptions(screen.getByLabelText(/state/i), "WA");
+
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/password does not meet requirements/i)
+      ).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ConfirmSignUpPage tests
+// ---------------------------------------------------------------------------
+
+describe("ConfirmSignUpPage", () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    sessionStorage.clear();
+    const mod = await import("@/pages/auth/ConfirmSignUpPage");
+    ConfirmSignUpPageComponent = mod.ConfirmSignUpPage;
+  });
+
+  function renderConfirmPage(email = "test@example.com") {
+    return render(
+      <MemoryRouter initialEntries={[`/auth/confirm?email=${encodeURIComponent(email)}`]}>
+        <Routes>
+          <Route path="/auth/confirm" element={<ConfirmSignUpPageComponent />} />
+          <Route path="/auth/sign-in" element={<div>SignIn reached</div>} />
+          <Route path="/auth/sign-up" element={<div>SignUp reached</div>} />
+        </Routes>
       </MemoryRouter>
     );
-    expect(
-      screen.getByText(/invitation only/i)
-    ).toBeInTheDocument();
+  }
+
+  it("renders confirmation code input", () => {
+    renderConfirmPage();
+    expect(screen.getByLabelText(/6-digit confirmation code/i)).toBeInTheDocument();
+  });
+
+  it("shows validation error when code is not 6 digits", async () => {
+    renderConfirmPage();
+    await userEvent.type(screen.getByLabelText(/6-digit confirmation code/i), "123");
+    fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/6-digit/i);
+    });
+  });
+
+  it("calls cognitoConfirmSignUp with email and code", async () => {
+    mockCognitoConfirmSignUp.mockResolvedValueOnce(undefined);
+
+    renderConfirmPage("user@example.com");
+
+    await userEvent.type(screen.getByLabelText(/6-digit confirmation code/i), "123456");
+    fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
+
+    await waitFor(() => {
+      expect(mockCognitoConfirmSignUp).toHaveBeenCalledWith(
+        "user@example.com",
+        "123456"
+      );
+    });
+  });
+
+  it("redirects to /auth/sign-in?verified=true on success (SEC-CRED-03)", async () => {
+    mockCognitoConfirmSignUp.mockResolvedValueOnce(undefined);
+
+    renderConfirmPage("user@example.com");
+
+    await userEvent.type(screen.getByLabelText(/6-digit confirmation code/i), "999888");
+    fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("SignIn reached")).toBeInTheDocument();
+    });
+  });
+
+  it("never stores password in sessionStorage — no signup_password key (SEC-CRED-03)", async () => {
+    mockCognitoConfirmSignUp.mockResolvedValueOnce(undefined);
+
+    renderConfirmPage("user@example.com");
+
+    await userEvent.type(screen.getByLabelText(/6-digit confirmation code/i), "777666");
+    fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("SignIn reached")).toBeInTheDocument();
+    });
+
+    expect(sessionStorage.getItem("signup_password")).toBeNull();
+  });
+
+  it("shows error when cognitoConfirmSignUp fails", async () => {
+    mockCognitoConfirmSignUp.mockRejectedValueOnce(new Error("Invalid verification code"));
+
+    renderConfirmPage("user@example.com");
+
+    await userEvent.type(screen.getByLabelText(/6-digit confirmation code/i), "000000");
+    fireEvent.click(screen.getByRole("button", { name: /confirm account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/invalid verification code/i);
+    });
   });
 });
 

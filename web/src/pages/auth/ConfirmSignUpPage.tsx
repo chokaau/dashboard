@@ -1,12 +1,20 @@
 /**
- * ConfirmSignUpPage — 6-digit code verification (story-5-3).
+ * ConfirmSignUpPage — 6-digit code verification (dashboard-9).
  *
  * Route: /auth/confirm
- * On success: navigates to /setup.
+ * After successful confirmSignUp:
+ *  1. Redirects to /auth/sign-in?verified=true (SEC-CRED-03)
+ *  2. Registration completes transparently after sign-in via the auth provider
+ *
+ * Never performs auto-sign-in; password is never stored in sessionStorage.
  */
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { confirmSignUp } from "aws-amplify/auth";
+import { cognitoConfirmSignUp } from "@/adapters/cognito-auth-provider";
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function ConfirmSignUpPage() {
   const navigate = useNavigate();
@@ -24,11 +32,19 @@ export function ConfirmSignUpPage() {
       setError("Please enter the 6-digit confirmation code.");
       return;
     }
+
+    const targetEmail = email.trim();
+    if (!targetEmail) {
+      setError("Registration incomplete. Please sign up again.");
+      navigate("/auth/sign-up", { replace: true });
+      return;
+    }
+
     setSubmitting(true);
     setError("");
     try {
-      await confirmSignUp({ username: email, confirmationCode: code });
-      navigate("/setup", { replace: true });
+      await cognitoConfirmSignUp(targetEmail, code);
+      navigate("/auth/sign-in?verified=true", { replace: true });
     } catch (err) {
       setError((err as Error).message ?? "Confirmation failed. Please try again.");
     } finally {

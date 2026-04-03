@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
     bucket         = "choka-tofu-state"
-    key            = "dashboard/terraform.tfstate"
+    # key passed via: tofu init -backend-config="key=dashboard/<env>/terraform.tfstate"
     region         = "ap-southeast-2"
     dynamodb_table = "choka-tofu-locks"
     encrypt        = true

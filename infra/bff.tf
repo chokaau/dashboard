@@ -151,7 +151,7 @@ resource "aws_lb_target_group" "bff" {
   port        = 8000
   protocol    = "HTTP"
   target_type = "ip"
-  vpc_id      = local.dev_vpc_id
+  vpc_id      = local.shared_vpc_id
 
   health_check {
     path                = "/api/health"

@@ -27,7 +27,7 @@ variable "aws_region" {
 variable "image_tag" {
   description = "Docker image tag to deploy for the BFF service"
   type        = string
-  default     = "latest"
+  default     = "init"
 }
 
 variable "desired_count" {

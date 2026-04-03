@@ -17,6 +17,7 @@ locals {
   # Networking — dev-only until demo/prod VPCs are provisioned in core-infrastructure.
   # See: chokaau/core-infrastructure CLAUDE.md "Adding New Environments"
   # ---------------------------------------------------------------------------
+  shared_vpc_id          = data.terraform_remote_state.networking.outputs.shared_vpc_id
   dev_vpc_id             = data.terraform_remote_state.networking.outputs.dev_vpc_id
   dev_public_subnet_ids  = data.terraform_remote_state.networking.outputs.dev_public_subnet_ids
   dev_private_subnet_ids = data.terraform_remote_state.networking.outputs.dev_private_subnet_ids

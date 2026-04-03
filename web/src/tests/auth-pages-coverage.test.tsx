@@ -22,13 +22,33 @@ vi.mock("aws-amplify/auth", () => ({
   resetPassword: vi.fn(),
   confirmResetPassword: vi.fn(),
   signOut: vi.fn(),
+  fetchAuthSession: vi.fn(),
+  signUp: vi.fn(),
+}));
+
+// Mock cognitoSignUp from the auth provider adapter
+vi.mock("@/adapters/cognito-auth-provider", () => ({
+  useCognitoAuth: () => ({
+    isLoaded: true,
+    isAuthenticated: false,
+    user: null,
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+    getAccessToken: vi.fn(),
+  }),
+  CognitoAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  cognitoSignUp: vi.fn(),
 }));
 
 import * as amplifyAuth from "aws-amplify/auth";
+import * as authProvider from "@/adapters/cognito-auth-provider";
 
 // Typed refs grabbed after mock is established
 const mockConfirmSignUp = vi.mocked(amplifyAuth.confirmSignUp);
 const mockConfirmResetPassword = vi.mocked(amplifyAuth.confirmResetPassword);
+const mockSignIn = vi.mocked(amplifyAuth.signIn);
+const mockFetchAuthSession = vi.mocked(amplifyAuth.fetchAuthSession);
+const mockCognitoSignUp = vi.mocked(authProvider.cognitoSignUp);
 
 // ---------------------------------------------------------------------------
 // SignUpPage
@@ -48,9 +68,13 @@ function renderSignUp() {
 }
 
 describe("SignUpPage", () => {
-  it("shows invitation-only message", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders the signup form", () => {
     renderSignUp();
-    expect(screen.getByText(/invitation only/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create account/i })).toBeInTheDocument();
   });
 
   it("shows a link to sign in", () => {
@@ -81,7 +105,8 @@ function renderConfirm(search = "?email=owner@example.com") {
 
 describe("ConfirmSignUpPage", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    sessionStorage.clear();
   });
 
   it("shows validation error when code length is not 6 digits", async () => {
@@ -97,6 +122,7 @@ describe("ConfirmSignUpPage", () => {
 
   it("calls confirmSignUp with correct args on valid 6-digit code", async () => {
     mockConfirmSignUp.mockResolvedValueOnce({});
+    // No password in sessionStorage — auto-sign-in skipped
     renderConfirm();
 
     const input = screen.getByLabelText(/6-digit confirmation code/i);
@@ -113,6 +139,7 @@ describe("ConfirmSignUpPage", () => {
 
   it("navigates to /setup on success", async () => {
     mockConfirmSignUp.mockResolvedValueOnce({});
+    // No password in sessionStorage — auto-sign-in skipped
     renderConfirm();
 
     const input = screen.getByLabelText(/6-digit confirmation code/i);

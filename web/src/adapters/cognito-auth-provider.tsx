@@ -19,6 +19,7 @@ import {
   getCurrentUser,
   signIn as amplifySignIn,
   signOut as amplifySignOut,
+  signUp as amplifySignUp,
 } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
 import { ConfigurationError } from "@/components/error-boundaries/ConfigurationError";
@@ -100,6 +101,25 @@ export function CognitoAuthProvider({ children }: CognitoAuthProviderProps) {
   });
 
   return <CognitoAuthProviderInner>{children}</CognitoAuthProviderInner>;
+}
+
+// ---------------------------------------------------------------------------
+// Stand-alone signUp helper (used by SignUpPage without context)
+// ---------------------------------------------------------------------------
+
+/**
+ * Registers a new Cognito user. Throws on failure; callers handle errors.
+ */
+export async function cognitoSignUp(
+  email: string,
+  password: string,
+  name: string
+): Promise<void> {
+  await amplifySignUp({
+    username: email,
+    password,
+    options: { userAttributes: { email, name } },
+  });
 }
 
 function CognitoAuthProviderInner({ children }: CognitoAuthProviderProps) {

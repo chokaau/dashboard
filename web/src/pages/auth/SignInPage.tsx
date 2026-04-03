@@ -4,7 +4,7 @@
  * story-5-3
  */
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { confirmSignIn } from "aws-amplify/auth";
 import { useCognitoAuth } from "@/adapters/cognito-auth-provider";
 
@@ -339,6 +339,16 @@ export function SignInPage() {
             Forgot password?
           </a>
         </div>
+
+        <p className="text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link
+            to="/auth/sign-up"
+            className="text-primary underline underline-offset-2 hover:no-underline"
+          >
+            Sign up
+          </Link>
+        </p>
       </div>
     </main>
   );

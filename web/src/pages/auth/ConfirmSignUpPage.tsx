@@ -1,12 +1,66 @@
 /**
- * ConfirmSignUpPage — 6-digit code verification (story-5-3).
+ * ConfirmSignUpPage — 6-digit code verification (dashboard-9).
  *
  * Route: /auth/confirm
- * On success: navigates to /setup.
+ * After successful confirmSignUp:
+ *  1. Auto-sign-in using password from sessionStorage
+ *  2. POST to /api/auth/register with business metadata
+ *  3. Clear sessionStorage
+ *  4. Navigate to /setup
  */
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { confirmSignUp } from "aws-amplify/auth";
+import { confirmSignUp, signIn as amplifySignIn, fetchAuthSession } from "aws-amplify/auth";
+
+// ---------------------------------------------------------------------------
+// SessionStorage keys (written by SignUpPage)
+// ---------------------------------------------------------------------------
+
+const SS_PASSWORD = "signup_password";
+const SS_BUSINESS_NAME = "signup_business_name";
+const SS_OWNER_NAME = "signup_owner_name";
+const SS_STATE = "signup_state";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function getIdToken(): Promise<string> {
+  const session = await fetchAuthSession();
+  const token = session.tokens?.idToken?.toString();
+  if (!token) throw new Error("No auth token available after sign-in");
+  return token;
+}
+
+async function callRegister(token: string): Promise<void> {
+  const body = {
+    business_name: sessionStorage.getItem(SS_BUSINESS_NAME) ?? "",
+    owner_name: sessionStorage.getItem(SS_OWNER_NAME) ?? "",
+    state: sessionStorage.getItem(SS_STATE) ?? "",
+  };
+  const res = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`Registration failed: ${res.status}`);
+  }
+}
+
+function clearSignupSession(): void {
+  sessionStorage.removeItem(SS_PASSWORD);
+  sessionStorage.removeItem(SS_BUSINESS_NAME);
+  sessionStorage.removeItem(SS_OWNER_NAME);
+  sessionStorage.removeItem(SS_STATE);
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function ConfirmSignUpPage() {
   const navigate = useNavigate();
@@ -28,6 +82,15 @@ export function ConfirmSignUpPage() {
     setError("");
     try {
       await confirmSignUp({ username: email, confirmationCode: code });
+
+      const password = sessionStorage.getItem(SS_PASSWORD) ?? "";
+      if (password) {
+        await amplifySignIn({ username: email, password });
+        const token = await getIdToken();
+        await callRegister(token);
+      }
+
+      clearSignupSession();
       navigate("/setup", { replace: true });
     } catch (err) {
       setError((err as Error).message ?? "Confirmation failed. Please try again.");

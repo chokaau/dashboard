@@ -62,11 +62,10 @@ def _format_timestamp(call_time_utc: datetime, now_melb: datetime) -> str:
     return call_melb.strftime("%-d %b ") + time_str
 
 
-def _derive_caller_name(caller_name: str, phone_hash: str) -> str:
+def _derive_caller_name(caller_name: str) -> str:
     """Derive callerName from stored metadata (no raw phone numbers).
 
     Priority: caller_name from details > "Unknown caller".
-    phone_hash is a truncated sha256 — never a raw phone number.
     """
     if caller_name:
         return caller_name
@@ -139,10 +138,7 @@ async def _read_calls_from_redis(
 
         call_item = {
             "id": call_id,
-            "callerName": _derive_caller_name(
-                meta.get("caller_name", ""),
-                meta.get("phone_hash", ""),
-            ),
+            "callerName": _derive_caller_name(meta.get("caller_name", "")),
             "duration": _format_duration(duration_s),
             "timestamp": _format_timestamp(call_time_utc, now_melb),
             "status": status,
@@ -232,10 +228,12 @@ async def get_call_list(
     """
     calls: list[dict[str, Any]] = []
     degraded = False
+    total_count = 0
 
     if redis is not None:
         index_key = f"call_index:{env_short}:{tenant_slug}"
         zcard = await redis.zcard(index_key)
+        total_count = zcard
 
         if zcard == 0:
             # Redis index empty — S3 fallback (stub returns [] for now)
@@ -248,12 +246,14 @@ async def get_call_list(
     now_melb = datetime.now(_MELB_TZ)
     stats = _compute_stats(calls, now_melb)
 
+    # total is zcard (all records in the sorted set). When a status filter is
+    # active, zcard counts all statuses so the total is approximate.
     result: dict[str, Any] = {
         "calls": calls,
         "pagination": {
             "page": page,
             "pageSize": page_size,
-            "total": len(calls),
+            "total": total_count,
         },
         "stats": stats,
     }

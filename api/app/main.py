@@ -15,6 +15,7 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_log import RequestLogMiddleware
 from app.middleware.auth import JWTAuthMiddleware
 from app.routes import billing, calls, events, health, profile, recordings, setup
+import app.routes.events as _events_module
 
 log = structlog.get_logger()
 
@@ -24,6 +25,12 @@ async def lifespan(app: FastAPI):
     """Startup: load config, wire Redis. Shutdown: close connections."""
     config = get_config()
     app.state.config = config
+
+    # Populate SSE module-level constants from AppConfig so they are config-driven,
+    # not read from os.environ directly. Tests may still patch these constants.
+    _events_module.SSE_PING_INTERVAL_SECONDS = config.sse_ping_interval_seconds
+    _events_module.SSE_MAX_CONNECTION_SECONDS = config.sse_max_connection_seconds
+    _events_module.SSE_MAX_CONNECTIONS_PER_TENANT = config.sse_max_connections_per_tenant
 
     # Wire Redis (optional — rate limit and metadata index)
     try:

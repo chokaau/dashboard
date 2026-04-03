@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timezone
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import aioboto3
 import structlog
@@ -18,13 +18,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.dependencies.tenant import TenantContext, extract_tenant_context
 from app.services.call_list import get_call_list
+from app.services.s3_keys import _CALL_ID_RE
 
 log = structlog.get_logger()
 
 router = APIRouter(prefix="/calls", tags=["calls"])
-
-# call_id validation pattern: alphanumeric + hyphen + underscore, 1-128 chars
-_CALL_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9\-\_]{0,127}$")
 
 # date_range validation: relative shortcut (e.g. "7d", "30d", "today") or
 # ISO date range "YYYY-MM-DD/YYYY-MM-DD"
@@ -44,7 +42,7 @@ async def list_calls(
     tenant: Annotated[TenantContext, Depends(extract_tenant_context)],
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
-    status: str | None = None,
+    status: Literal["missed", "completed", "needs-callback"] | None = None,
     date_range: Annotated[
         str | None,
         Query(

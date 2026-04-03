@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.dependencies.tenant import TenantContext, extract_tenant_context
+from app.services.s3_keys import _CALL_ID_RE
 
 log = structlog.get_logger()
 
@@ -26,7 +27,6 @@ router = APIRouter(tags=["recordings"])
 
 # Range header validation: bytes=START-END or bytes=START-
 _RANGE_RE = re.compile(r"^bytes=\d+(-\d+)?$")
-_CALL_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9\-\_]{0,127}$")
 
 # Structured log event names
 _RECORDING_STREAM_INTERRUPTED = "recording_stream_interrupted"
@@ -39,6 +39,7 @@ async def _stream_s3_body(body) -> AsyncIterator[bytes]:
             yield chunk
     except Exception as exc:
         log.error(_RECORDING_STREAM_INTERRUPTED, error=str(exc))
+        raise
 
 
 @router.get("/calls/{call_id}/recording")

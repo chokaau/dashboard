@@ -20,6 +20,7 @@ from ruamel.yaml import YAML
 
 from app.dependencies.tenant import TenantContext, extract_tenant_context
 from app.models.business_config import BusinessConfig
+from app.services.s3_keys import setup_complete_key as _setup_complete_key
 
 log = structlog.get_logger()
 
@@ -31,10 +32,6 @@ _yaml.default_flow_style = False
 
 def _profile_s3_key(env_short: str, tenant_slug: str) -> str:
     return f"{env_short}/{tenant_slug}/business.yaml"
-
-
-def _setup_complete_key(env_short: str, tenant_slug: str) -> str:
-    return f"{env_short}/{tenant_slug}/setup_complete.json"
 
 
 async def _check_setup_complete(s3, bucket: str, key: str) -> bool:

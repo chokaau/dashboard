@@ -44,16 +44,27 @@ class _FakeStreamBody:
 
 def _mock_s3_get_object(body_data: bytes = b"FAKE_AUDIO"):
     """Return a mock aioboto3 S3 get_object response."""
-    stream_body = MagicMock()
-    stream_body.__aiter__ = AsyncMock(return_value=iter([body_data]))
 
-    async def _read():
-        return body_data
+    class _AsyncStreamBody:
+        """Proper async iterable S3 body stub.
 
-    stream_body.read = _read
+        __aiter__ must be a plain method (not AsyncMock) returning an async
+        generator so that `async for chunk in body` works correctly. Using
+        AsyncMock here returns a coroutine from __aiter__, which is not a valid
+        async iterator and causes TypeError in _stream_s3_body.
+        """
+
+        def __aiter__(self):
+            return self._gen()
+
+        async def _gen(self):
+            yield body_data
+
+        async def read(self):
+            return body_data
 
     response = {
-        "Body": stream_body,
+        "Body": _AsyncStreamBody(),
         "ContentType": "audio/mpeg",
         "ContentLength": len(body_data),
     }
@@ -289,12 +300,18 @@ def test_recording_response_headers(client, auth_headers, app_no_redis):
 # ---------------------------------------------------------------------------
 
 
-def test_midstream_exception_logs_and_closes_generator(client, auth_headers, app_no_redis, capsys):
+def test_midstream_exception_logs_and_closes_generator(app_no_redis, auth_headers, capsys):
     """AC-8: S3 stream raising mid-stream → recording_stream_interrupted logged at ERROR.
+
+    After Fix GEN-ERR-02a the exception is re-raised after logging so the ASGI
+    server tears down the connection. We use raise_server_exceptions=False so
+    TestClient captures the partial response rather than propagating the error.
 
     structlog renders to stdout in the test environment, so we capture stdout
     rather than using caplog (which only intercepts stdlib logging records).
     """
+    from fastapi.testclient import TestClient
+
     redis = _mock_redis_for_recording("cc-001", "acme")
     app_no_redis.state.redis = redis
 
@@ -325,10 +342,12 @@ def test_midstream_exception_logs_and_closes_generator(client, auth_headers, app
     mock_session = MagicMock()
     mock_session.client = MagicMock(return_value=mock_s3_client)
 
-    with patch("app.routes.recordings.aioboto3.Session", return_value=mock_session):
-        resp = client.get("/api/calls/cc-001/recording", headers=auth_headers)
+    with TestClient(app_no_redis, raise_server_exceptions=False) as error_client:
+        with patch("app.routes.recordings.aioboto3.Session", return_value=mock_session):
+            resp = error_client.get("/api/calls/cc-001/recording", headers=auth_headers)
 
-    # Response is initiated (streaming started)
+    # Headers are sent before streaming starts so status is 200; the connection
+    # is torn down mid-stream after the exception is re-raised.
     assert resp.status_code == 200
 
     # structlog renders to stdout — assert event name and level appear

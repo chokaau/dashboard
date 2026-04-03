@@ -17,14 +17,11 @@ from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.dependencies.tenant import TenantContext, extract_tenant_context
+from app.services.s3_keys import setup_complete_key as _setup_complete_key
 
 log = structlog.get_logger()
 
 router = APIRouter(tags=["setup"])
-
-
-def _setup_complete_key(env_short: str, tenant_slug: str) -> str:
-    return f"{env_short}/{tenant_slug}/setup_complete.json"
 
 
 @router.post("/setup/complete")

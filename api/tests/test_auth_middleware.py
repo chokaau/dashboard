@@ -85,7 +85,7 @@ def _build_app() -> object:
     return app
 
 
-async def _stub_event_generator(request, tenant_slug, env_short):
+async def _stub_event_generator(request, tenant_slug, env_short, **kwargs):
     """One-shot SSE generator — yields a single ping and stops.
 
     Replaces the real infinite SSE generator in tests so that TestClient

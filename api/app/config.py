@@ -23,6 +23,7 @@ class AppConfig(BaseSettings):
     redis_metadata_enabled: bool = True
 
     # SSE
+    sse_ping_interval_seconds: int = 30
     sse_max_connection_seconds: int = 600
     sse_max_connections_per_tenant: int = 5
 

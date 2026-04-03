@@ -135,7 +135,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Install OpenTofu
-        uses: opentofu/setup-opentofu@v1
+        uses: opentofu/setup-opentofu@v1.0.5
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
 
@@ -151,11 +151,6 @@ jobs:
         run: |
           ENV="${{ inputs.environment || 'dev' }}"
           tofu init -input=false
-          # Refresh data sources only (safe, read-only)
-          tofu apply -var-file="environments/${ENV}.tfvars" \
-            -refresh-only -auto-approve \
-            > /dev/null 2>&1 || true
-          # Extract outputs
           if tofu output -json > /tmp/outputs.json 2>/dev/null; then
             echo "cognito_user_pool_id=$(jq -r '.cognito_user_pool_id.value // empty' /tmp/outputs.json)" >> "$GITHUB_OUTPUT"
             echo "cognito_client_id=$(jq -r '.cognito_client_id.value // empty' /tmp/outputs.json)" >> "$GITHUB_OUTPUT"

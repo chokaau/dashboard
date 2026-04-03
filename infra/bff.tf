@@ -86,7 +86,7 @@ resource "aws_ecs_task_definition" "bff" {
   container_definitions = jsonencode([
     {
       name      = "bff"
-      image     = "${aws_ecr_repository.dashboard_api.repository_url}:${var.image_tag}"
+      image     = "${local.ecr_repo_url}:${var.image_tag}"
       essential = true
 
       portMappings = [
@@ -225,6 +225,10 @@ resource "aws_ecs_service" "bff" {
   }
 
   lifecycle {
-    ignore_changes = [task_definition]
+    ignore_changes = [task_definition, desired_count]
+    precondition {
+      condition     = var.env_short == "dev" || var.desired_count == 0
+      error_message = "Only dev environment has provisioned VPC/subnets. Set desired_count = 0 for ${var.env_short} until networking is ready."
+    }
   }
 }

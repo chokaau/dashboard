@@ -19,8 +19,8 @@ output "cloudfront_distribution_id" {
 }
 
 output "ecr_repo_url" {
-  description = "ECR repository URL for the dashboard BFF image"
-  value       = aws_ecr_repository.dashboard_api.repository_url
+  description = "ECR repository URL for the dashboard BFF container image"
+  value       = local.ecr_repo_url
 }
 
 output "bff_service_name" {

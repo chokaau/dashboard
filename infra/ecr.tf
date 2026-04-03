@@ -1,6 +1,9 @@
+# ECR repository is shared across environments — only created by the dev apply.
+# Demo/prod reference the same repo by name.
 resource "aws_ecr_repository" "dashboard_api" {
+  count                = var.env_short == "dev" ? 1 : 0
   name                 = "choka-dashboard-api"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
@@ -8,7 +11,8 @@ resource "aws_ecr_repository" "dashboard_api" {
 }
 
 resource "aws_ecr_lifecycle_policy" "dashboard_api" {
-  repository = aws_ecr_repository.dashboard_api.name
+  count      = var.env_short == "dev" ? 1 : 0
+  repository = aws_ecr_repository.dashboard_api[0].name
 
   policy = jsonencode({
     rules = [
@@ -26,4 +30,13 @@ resource "aws_ecr_lifecycle_policy" "dashboard_api" {
       }
     ]
   })
+}
+
+data "aws_ecr_repository" "dashboard_api" {
+  count = var.env_short != "dev" ? 1 : 0
+  name  = "choka-dashboard-api"
+}
+
+locals {
+  ecr_repo_url = var.env_short == "dev" ? aws_ecr_repository.dashboard_api[0].repository_url : data.aws_ecr_repository.dashboard_api[0].repository_url
 }

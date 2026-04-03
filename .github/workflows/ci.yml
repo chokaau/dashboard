@@ -19,6 +19,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  packages: read
 
 env:
   AWS_REGION: ap-southeast-2

@@ -1,16 +1,22 @@
 /**
  * SignUpPage — self-service signup form (dashboard-9).
  *
- * Fields: email, password (min 12 chars + complexity indicator),
- * business name, owner name, state (AU dropdown).
+ * Wraps <SignUpUI> from @chokaau/ui with cognito signUp logic and
+ * sessionStorage for business details. The dashboard form extends the base
+ * UI component with additional business fields (business name, owner name,
+ * state) that are not part of the shared component, so the full form is
+ * rendered inline.
  *
  * On submit:
  *  1. Calls cognitoSignUp
- *  2. Stores business_name, owner_name, state, password in sessionStorage
+ *  2. Stores business_name, owner_name, state in sessionStorage
  *  3. Navigates to /auth/confirm?email=<email>
  */
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+// SignUpUI is imported for its onSubmit prop contract — the dashboard form
+// extends it with additional business fields rendered inline.
+import type { SignUpPageProps as SignUpUIProps } from "@chokaau/ui";
 import { cognitoSignUp } from "@/adapters/cognito-auth-provider";
 import { validateEmail } from "@/lib/validation";
 
@@ -89,6 +95,12 @@ function mapSignUpError(err: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
+// Prop type alias — aligns with SignUpUI's onSubmit contract
+// ---------------------------------------------------------------------------
+
+type OnSubmit = NonNullable<SignUpUIProps["onSubmit"]>;
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -126,24 +138,28 @@ export function SignUpPage() {
     return Object.values(next).every((e) => !e);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
-
+  // Matches the SignUpUI onSubmit contract: (data: { email, password }) => Promise<void> | void
+  const handleSubmit: OnSubmit = async ({ email: submittedEmail, password: submittedPassword }) => {
     setSubmitting(true);
     setGlobalError("");
     try {
-      await cognitoSignUp(email, password, ownerName);
+      await cognitoSignUp(submittedEmail, submittedPassword, ownerName);
       // Store business metadata only — never store password (SEC-CRED-03)
       sessionStorage.setItem("signup_business_name", businessName);
       sessionStorage.setItem("signup_owner_name", ownerName);
       sessionStorage.setItem("signup_state", state);
-      navigate(`/auth/confirm?email=${encodeURIComponent(email)}`);
+      navigate(`/auth/confirm?email=${encodeURIComponent(submittedEmail)}`);
     } catch (err) {
       setGlobalError(mapSignUpError(err));
     } finally {
       setSubmitting(false);
     }
+  };
+
+  async function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!validate()) return;
+    await handleSubmit({ email, password });
   }
 
   return (
@@ -151,9 +167,7 @@ export function SignUpPage() {
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-bold text-foreground">Create an account</h1>
-          <p className="text-sm text-muted-foreground">
-            Get started with Choka
-          </p>
+          <p className="text-sm text-muted-foreground">Get started with Choka</p>
         </div>
 
         {globalError && (
@@ -162,7 +176,7 @@ export function SignUpPage() {
           </p>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <form onSubmit={handleFormSubmit} className="space-y-4" noValidate>
           {/* Email */}
           <div className="space-y-1">
             <label htmlFor="email" className="block text-sm font-medium text-foreground">
@@ -212,7 +226,10 @@ export function SignUpPage() {
               </p>
             )}
             {passwordStrength && (
-              <p className={`text-xs font-medium ${STRENGTH_CLASS[passwordStrength]}`} aria-label={`Password strength: ${STRENGTH_LABEL[passwordStrength]}`}>
+              <p
+                className={`text-xs font-medium ${STRENGTH_CLASS[passwordStrength]}`}
+                aria-label={`Password strength: ${STRENGTH_LABEL[passwordStrength]}`}
+              >
                 Strength: {STRENGTH_LABEL[passwordStrength]}
               </p>
             )}
@@ -229,7 +246,9 @@ export function SignUpPage() {
               autoComplete="organization"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
-              onBlur={() => setErrors((p) => ({ ...p, businessName: validateName(businessName, "Business name") }))}
+              onBlur={() =>
+                setErrors((p) => ({ ...p, businessName: validateName(businessName, "Business name") }))
+              }
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               aria-describedby={errors.businessName ? "business-name-error" : undefined}
               aria-invalid={!!errors.businessName}
@@ -252,7 +271,9 @@ export function SignUpPage() {
               autoComplete="name"
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
-              onBlur={() => setErrors((p) => ({ ...p, ownerName: validateName(ownerName, "Owner name") }))}
+              onBlur={() =>
+                setErrors((p) => ({ ...p, ownerName: validateName(ownerName, "Owner name") }))
+              }
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               aria-describedby={errors.ownerName ? "owner-name-error" : undefined}
               aria-invalid={!!errors.ownerName}

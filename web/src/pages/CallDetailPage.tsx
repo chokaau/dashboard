@@ -1,15 +1,23 @@
 /**
  * CallDetailPage — full detail view for a single call (story-5-6).
+ * Updated dashboard-15: uses @chokaau/ui CallDetailActionBar, CallTranscript,
+ * AudioPlayer.
  *
  * Fetches GET /api/calls/:id via TanStack Query.
  * Shows: caller name/phone, intent badge, summary, transcript, timestamp,
  * duration, needs-callback indicator, back navigation.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Clock, Phone, PhoneOff } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { PageError, Skeleton } from "@chokaau/ui";
+import {
+  PageError,
+  Skeleton,
+  CallDetailActionBar,
+  CallTranscript,
+  AudioPlayer,
+} from "@chokaau/ui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,9 +32,11 @@ interface CallDetail {
   intent: LeadIntent;
   summary: string;
   transcript?: string;
+  recordingUrl?: string;
   timestamp: string;
   duration: string;
   needsCallback: boolean;
+  handled?: boolean;
   urgent?: boolean;
 }
 
@@ -50,6 +60,54 @@ const INTENT_COLOURS: Record<LeadIntent, string> = {
   other: "bg-gray-100 text-gray-700",
 };
 
+interface TranscriptMessage {
+  speaker: "ai" | "caller";
+  text: string;
+  timestamp: string;
+}
+
+/**
+ * Parse a plain-text transcript into structured TranscriptMessage[].
+ * Expected format: lines prefixed "AI: " or "Caller: " with optional timestamps.
+ * Falls back to a single caller message when format is unknown.
+ */
+function parseTranscript(raw: string): TranscriptMessage[] {
+  const lines = raw.split("\n").filter((l) => l.trim());
+  const messages: TranscriptMessage[] = [];
+  let lineIndex = 0;
+
+  for (const line of lines) {
+    const aiMatch = /^(?:AI|Receptionist|Choka):\s*(.+)/i.exec(line);
+    const callerMatch = /^(?:Caller|Customer|Client):\s*(.+)/i.exec(line);
+    lineIndex++;
+
+    if (aiMatch) {
+      messages.push({
+        speaker: "ai",
+        text: aiMatch[1],
+        timestamp: String(lineIndex),
+      });
+    } else if (callerMatch) {
+      messages.push({
+        speaker: "caller",
+        text: callerMatch[1],
+        timestamp: String(lineIndex),
+      });
+    } else if (line.trim()) {
+      // Unrecognised line — treat as caller speech
+      messages.push({
+        speaker: "caller",
+        text: line.trim(),
+        timestamp: String(lineIndex),
+      });
+    }
+  }
+
+  return messages.length > 0
+    ? messages
+    : [{ speaker: "caller", text: raw.trim(), timestamp: "0" }];
+}
+
 // ---------------------------------------------------------------------------
 // Skeleton loader
 // ---------------------------------------------------------------------------
@@ -72,11 +130,25 @@ function CallDetailSkeleton() {
 
 export function CallDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, refetch } = useQuery<CallDetail>({
     queryKey: ["calls", id],
     queryFn: () => apiFetch<CallDetail>(`/api/calls/${id}`),
     enabled: Boolean(id),
+  });
+
+  const markHandledMutation = useMutation({
+    mutationFn: (handled: boolean) =>
+      apiFetch(`/api/calls/${id}/handled`, {
+        method: "PUT",
+        body: JSON.stringify({ handled }),
+      }),
+    onSuccess: (_result, handled) => {
+      queryClient.setQueryData(["calls", id], (prev: CallDetail | undefined) =>
+        prev ? { ...prev, handled } : prev
+      );
+    },
   });
 
   if (isLoading) {
@@ -110,8 +182,12 @@ export function CallDetailPage() {
     );
   }
 
+  const transcriptMessages = data.transcript
+    ? parseTranscript(data.transcript)
+    : [];
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-24">
       {/* Header / back nav */}
       <div className="sticky top-0 z-10 border-b border-border bg-background px-4 py-3">
         <Link
@@ -133,19 +209,10 @@ export function CallDetailPage() {
               <h1 className="text-xl font-semibold text-foreground">
                 {data.callerName}
               </h1>
-              <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Phone className="h-3.5 w-3.5" />
+              <p className="mt-1 text-sm text-muted-foreground">
                 {data.callerPhone}
-              </div>
+              </p>
             </div>
-
-            {/* Needs callback badge */}
-            {data.needsCallback && (
-              <span className="flex items-center gap-1 rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-800">
-                <PhoneOff className="h-3 w-3" />
-                Needs callback
-              </span>
-            )}
           </div>
 
           {/* Intent + meta */}
@@ -155,11 +222,13 @@ export function CallDetailPage() {
             >
               {INTENT_LABEL[data.intent]}
             </span>
-            <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              {data.duration}
-            </span>
+            <span>{data.duration}</span>
             <span>{data.timestamp}</span>
+            {data.needsCallback && (
+              <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                Needs callback
+              </span>
+            )}
           </div>
         </section>
 
@@ -173,18 +242,41 @@ export function CallDetailPage() {
           </p>
         </section>
 
+        {/* Audio recording */}
+        {data.recordingUrl && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Recording
+            </h2>
+            <AudioPlayer
+              src={data.recordingUrl}
+              duration={data.duration}
+            />
+          </section>
+        )}
+
         {/* Transcript */}
-        {data.transcript && (
+        {transcriptMessages.length > 0 && (
           <section>
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Transcript
             </h2>
-            <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 font-mono text-xs leading-relaxed text-foreground">
-              {data.transcript}
-            </pre>
+            <CallTranscript messages={transcriptMessages} />
           </section>
         )}
       </div>
+
+      {/* Sticky action bar */}
+      <CallDetailActionBar
+        phone={data.callerPhone}
+        handled={data.handled ?? false}
+        onCallback={(phone) => {
+          window.location.href = `tel:${phone}`;
+        }}
+        onMarkHandled={(handled) => {
+          markHandledMutation.mutate(handled);
+        }}
+      />
     </div>
   );
 }

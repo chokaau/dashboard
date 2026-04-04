@@ -57,6 +57,10 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 import { DashboardPage } from "@/pages/DashboardPage";
 
 vi.mock("@chokaau/ui", () => ({
+ActivationBanner: ({ status }: { status: string }) =>
+    status === "pending" ? (
+      <div role="alert">Your Voice service is being reviewed.</div>
+    ) : null,
 DashboardStatCard: ({
     label,
     value,

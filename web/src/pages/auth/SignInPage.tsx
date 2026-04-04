@@ -1,22 +1,16 @@
 /**
  * SignInPage — Amplify v6 headless sign-in with TOTP + FORCE_CHANGE_PASSWORD support.
  *
+ * Credentials step rendered by <SignInUI> from @chokaau/ui.
+ * TOTP and new-password steps remain inline.
+ *
  * story-5-3
  */
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmSignIn } from "aws-amplify/auth";
+import { SignInPage as SignInUI } from "@chokaau/ui";
 import { useCognitoAuth } from "@/adapters/cognito-auth-provider";
-import { validateEmail } from "@/lib/validation";
-
-// ---------------------------------------------------------------------------
-// Validation helpers
-// ---------------------------------------------------------------------------
-
-function validatePassword(value: string): string {
-  if (!value) return "Password is required";
-  return "";
-}
 
 // ---------------------------------------------------------------------------
 // Step types
@@ -37,12 +31,6 @@ export function SignInPage() {
   const isVerified = searchParams.get("verified") === "true";
   const { signIn } = useCognitoAuth();
 
-  // Credentials step
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-
   // TOTP step
   const [totpCode, setTotpCode] = useState("");
   const [totpError, setTotpError] = useState("");
@@ -53,38 +41,22 @@ export function SignInPage() {
 
   const [step, setStep] = useState<Step>("credentials");
   const [submitting, setSubmitting] = useState(false);
-  const [globalError, setGlobalError] = useState("");
 
   // ------------------------------------------------------------------
-  // Credentials submit
+  // Credentials submit — passed as onSubmit to SignInUI
   // ------------------------------------------------------------------
 
-  async function handleSignIn(e: React.FormEvent) {
-    e.preventDefault();
-    const eErr = validateEmail(email);
-    const pErr = validatePassword(password);
-    setEmailError(eErr);
-    setPasswordError(pErr);
-    if (eErr || pErr) return;
+  async function handleSignIn({ email, password }: { email: string; password: string }) {
+    const result = await signIn(email, password);
+    const next = (result as { nextStep?: { signInStep: string } } | undefined)
+      ?.nextStep?.signInStep;
 
-    setSubmitting(true);
-    setGlobalError("");
-    try {
-      const result = await signIn(email, password);
-      const next = (result as { nextStep?: { signInStep: string } } | undefined)
-        ?.nextStep?.signInStep;
-
-      if (next === "CONFIRM_SIGN_IN_WITH_TOTP_CODE") {
-        setStep("totp");
-      } else if (next === "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED") {
-        setStep("new_password");
-      } else {
-        navigate("/dashboard", { replace: true });
-      }
-    } catch (err) {
-      setGlobalError((err as Error).message ?? "Sign-in failed. Please try again.");
-    } finally {
-      setSubmitting(false);
+    if (next === "CONFIRM_SIGN_IN_WITH_TOTP_CODE") {
+      setStep("totp");
+    } else if (next === "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED") {
+      setStep("new_password");
+    } else {
+      navigate("/dashboard", { replace: true });
     }
   }
 
@@ -249,109 +221,22 @@ export function SignInPage() {
     );
   }
 
-  // Default: credentials step
+  // Default: credentials step — rendered by SignInUI from @chokaau/ui.
+  // The verified banner is shown above the UI component.
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-bold text-foreground">Sign in</h1>
-          <p className="text-sm text-muted-foreground">
-            Welcome back to Choka
-          </p>
-        </div>
-
-        {isVerified && (
-          <p role="status" className="rounded-md border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400">
+    <div>
+      {isVerified && (
+        <div className="fixed top-0 inset-x-0 z-50 flex justify-center px-4 pt-4">
+          <p
+            role="status"
+            className="rounded-md border border-green-500/40 bg-green-500/10 px-4 py-2 text-sm text-green-700 dark:text-green-400 shadow"
+          >
             Email verified! Sign in to complete your account setup.
           </p>
-        )}
-
-        {globalError && (
-          <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-            {globalError}
-          </p>
-        )}
-
-        <form onSubmit={handleSignIn} className="space-y-4" noValidate>
-          <div className="space-y-1">
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-foreground"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={() => setEmailError(validateEmail(email))}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              aria-describedby={emailError ? "email-error" : undefined}
-              aria-invalid={!!emailError}
-            />
-            {emailError && (
-              <p id="email-error" role="alert" className="text-xs text-destructive">
-                {emailError}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-foreground"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onBlur={() => setPasswordError(validatePassword(password))}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              aria-describedby={passwordError ? "password-error" : undefined}
-              aria-invalid={!!passwordError}
-            />
-            {passwordError && (
-              <p id="password-error" role="alert" className="text-xs text-destructive">
-                {passwordError}
-              </p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {submitting ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-
-        <div className="text-center text-sm">
-          <a
-            href="/auth/forgot-password"
-            className="text-primary underline underline-offset-2 hover:no-underline"
-          >
-            Forgot password?
-          </a>
         </div>
-
-        <p className="text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link
-            to="/auth/sign-up"
-            className="text-primary underline underline-offset-2 hover:no-underline"
-          >
-            Sign up
-          </Link>
-        </p>
-      </div>
-    </main>
+      )}
+      <SignInUI onSubmit={handleSignIn} />
+    </div>
   );
 }
 

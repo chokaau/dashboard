@@ -17,6 +17,62 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Mock @chokaau/ui components
 // ---------------------------------------------------------------------------
 
+vi.mock("@chokaau/ui", () => ({
+  Skeleton: ({ className }: { className?: string }) => (
+    <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
+  ),
+  PageError: ({
+    title,
+    description,
+    onRetry,
+  }: {
+    title?: string;
+    description: string;
+    onRetry: () => void;
+  }) => (
+    <div role="alert">
+      {title && <h2>{title}</h2>}
+      <p>{description}</p>
+      <button type="button" onClick={onRetry}>Try again</button>
+    </div>
+  ),
+  CallDetailActionBar: ({
+    phone,
+    handled,
+    onCallback,
+    onMarkHandled,
+  }: {
+    phone: string;
+    handled: boolean;
+    onCallback: (phone: string) => void;
+    onMarkHandled: (handled: boolean) => void;
+  }) => (
+    <div data-testid="action-bar">
+      <button type="button" onClick={() => onCallback(phone)}>Call Back</button>
+      <button type="button" onClick={() => onMarkHandled(!handled)}>
+        {handled ? "Mark Unhandled" : "Mark Handled"}
+      </button>
+    </div>
+  ),
+  CallTranscript: ({
+    messages,
+  }: {
+    messages: Array<{ speaker: string; text: string; timestamp: string }>;
+  }) => (
+    <div data-testid="transcript">
+      {messages.map((m, i) => (
+        <div key={i} data-testid={`msg-${m.speaker}`}>{m.text}</div>
+      ))}
+    </div>
+  ),
+  AudioPlayer: ({ src, duration }: { src: string; duration: string }) => (
+    <div data-testid="audio-player">
+      <span>{src}</span>
+      <span>{duration}</span>
+    </div>
+  ),
+}));
+
 // ---------------------------------------------------------------------------
 // Mock apiFetch
 // ---------------------------------------------------------------------------
@@ -48,29 +104,6 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 
 import { CallDetailPage } from "@/pages/CallDetailPage";
 
-vi.mock("@chokaau/ui", () => ({
-Skeleton: ({ className }: { className?: string }) => (
-    <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
-  ),
-PageError: ({
-    title,
-    description,
-    onRetry,
-  }: {
-    title?: string;
-    description: string;
-    onRetry: () => void;
-  }) => (
-    <div role="alert">
-      {title && <h2>{title}</h2>}
-      <p>{description}</p>
-      <button type="button" onClick={onRetry}>
-        Try again
-      </button>
-    </div>
-  ),
-}));
-
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,17 +127,23 @@ function renderPage(callId = "call-123") {
   );
 }
 
+// sampleCall has no transcript so CallTranscript is not rendered in core tests.
+// Tests that need transcript coverage use sampleCallWithTranscript.
 const sampleCall = {
   id: "call-123",
   callerName: "Jane Doe",
   callerPhone: "+61400000001",
   intent: "quote",
   summary: "Needs a quote for solar panel installation",
-  transcript: "Caller: Hi, I need a quote...",
   timestamp: "Today 9:00 AM",
   duration: "3m 22s",
   needsCallback: true,
   urgent: false,
+};
+
+const sampleCallWithTranscript = {
+  ...sampleCall,
+  transcript: "Caller: Hi, I need a quote for solar panels.",
 };
 
 // ---------------------------------------------------------------------------

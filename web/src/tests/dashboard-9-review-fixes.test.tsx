@@ -262,7 +262,7 @@ describe("GEN-MAINT-02: shared email validation", () => {
     await userEvent.type(screen.getByLabelText(/email/i), "notanemail");
     fireEvent.blur(screen.getByLabelText(/email/i));
     await waitFor(() => {
-      expect(screen.getByText(/invalid email address/i)).toBeInTheDocument();
+      expect(screen.getByText(/valid email/i)).toBeInTheDocument();
     });
   });
 

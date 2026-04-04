@@ -11,8 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useCallEvents } from "@/hooks/use-call-events";
 import { Phone, PhoneCall, PhoneOff, Clock } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { ActivationBanner } from "@/components/ActivationBanner";
-import { CallCard, DashboardStatCard, NeedsCallbackPanel, PageError } from "@chokaau/ui";
+import { ActivationBanner, CallCard, DashboardStatCard, NeedsCallbackPanel, PageError } from "@chokaau/ui";
 import type { CallCardProps, CallbackLead, LeadIntent } from "@chokaau/ui";
 
 // ---------------------------------------------------------------------------
@@ -141,7 +140,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6 p-6">
       {/* Activation banner — shown when pending activation */}
-      <ActivationBanner activationStatus={billingData?.activationStatus ?? "none"} />
+      <ActivationBanner status={billingData?.activationStatus ?? "none"} />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

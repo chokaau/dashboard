@@ -18,8 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { StepIndicator } from "@/components/StepIndicator";
-import { StepHeader } from "@/components/StepHeader";
+import { StepIndicator, StepHeader } from "@chokaau/ui";
 
 // ---------------------------------------------------------------------------
 // Types

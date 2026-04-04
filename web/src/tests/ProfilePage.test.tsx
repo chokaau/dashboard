@@ -35,14 +35,40 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 
 import { ProfilePage } from "@/pages/ProfilePage";
 
-vi.mock("@chokaau/ui", () => ({
-Skeleton: ({ className }: { className?: string }) => (
-    <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
-  ),
-InlineError: ({ message }: { message: string }) => (
-    <div role="alert" data-testid="inline-error">{message}</div>
-  ),
-}));
+vi.mock("@chokaau/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@chokaau/ui")>();
+  return {
+    ...actual,
+    Skeleton: ({ className }: { className?: string }) => (
+      <div data-testid="skeleton" className={`animate-pulse ${className ?? ""}`} />
+    ),
+    InlineError: ({ message }: { message: string }) => (
+      <div role="alert" data-testid="inline-error">{message}</div>
+    ),
+    GreetingPreview: ({
+      businessName,
+      services,
+    }: {
+      businessName: string;
+      services: string[];
+    }) => (
+      <div data-testid="greeting-preview">
+        <span>{businessName}</span>
+        {services.map((s, i) => <span key={i}>{s}</span>)}
+      </div>
+    ),
+    BusinessHoursEditor: ({
+      onChange,
+    }: {
+      hours: Record<string, { enabled: boolean; open: string; close: string }>;
+      onChange: (h: Record<string, { enabled: boolean; open: string; close: string }>) => void;
+    }) => (
+      <div data-testid="business-hours-editor">
+        <button type="button" onClick={() => onChange({} as never)}>Edit hours</button>
+      </div>
+    ),
+  };
+});
 
 
 function makeQC() {

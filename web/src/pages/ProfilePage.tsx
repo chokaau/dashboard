@@ -1,12 +1,18 @@
 /**
  * ProfilePage — edit business name, AI greeting, notification prefs (story-5-7).
+ * Updated dashboard-15: uses @chokaau/ui GreetingPreview, BusinessHoursEditor.
  *
  * Fetches GET /api/profile, saves via PUT /api/profile.
  */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
-import { InlineError, Skeleton } from "@chokaau/ui";
+import {
+  InlineError,
+  Skeleton,
+  GreetingPreview,
+  BusinessHoursEditor,
+} from "@chokaau/ui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,10 +20,43 @@ import { InlineError, Skeleton } from "@chokaau/ui";
 
 type NotificationPreference = "all" | "leads_only" | "none";
 
+type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+interface DayHours {
+  enabled: boolean;
+  open: string;
+  close: string;
+}
+
+type BusinessHours = Record<DayKey, DayHours>;
+
 interface ProfileData {
   businessName: string;
   greeting: string;
   notificationPreference: NotificationPreference;
+  services?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const DEFAULT_HOURS: BusinessHours = {
+  mon: { enabled: true, open: "07:00", close: "17:00" },
+  tue: { enabled: true, open: "07:00", close: "17:00" },
+  wed: { enabled: true, open: "07:00", close: "17:00" },
+  thu: { enabled: true, open: "07:00", close: "17:00" },
+  fri: { enabled: true, open: "07:00", close: "17:00" },
+  sat: { enabled: false, open: "08:00", close: "12:00" },
+  sun: { enabled: false, open: "08:00", close: "12:00" },
+};
+
+function parseServicesArray(services: string | undefined): string[] {
+  if (!services) return [];
+  return services
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +102,7 @@ export function ProfilePage() {
   const [notificationPreference, setNotificationPreference] = useState<
     NotificationPreference | undefined
   >();
+  const [businessHours, setBusinessHours] = useState<BusinessHours>(DEFAULT_HOURS);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -70,6 +110,7 @@ export function ProfilePage() {
   const formBusinessName = businessName ?? data?.businessName ?? "";
   const formGreeting = greeting ?? data?.greeting ?? "";
   const formNotification = notificationPreference ?? data?.notificationPreference ?? "all";
+  const formServicesArray = parseServicesArray(data?.services);
 
   const mutation = useMutation({
     mutationFn: (payload: ProfileData) =>
@@ -139,6 +180,21 @@ export function ProfilePage() {
             value={formGreeting}
             onChange={(e) => setGreeting(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        {/* Greeting preview */}
+        <GreetingPreview
+          businessName={formBusinessName}
+          services={formServicesArray}
+        />
+
+        {/* Business hours editor */}
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-foreground">Business hours</p>
+          <BusinessHoursEditor
+            hours={businessHours}
+            onChange={setBusinessHours}
           />
         </div>
 

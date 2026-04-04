@@ -7,6 +7,7 @@
  */
 import { useNavigate } from "react-router-dom";
 import { Mic, FileText } from "lucide-react";
+import { ProductCard } from "@chokaau/ui";
 
 export function SetupPage() {
   const navigate = useNavigate();
@@ -19,49 +20,19 @@ export function SetupPage() {
       </p>
 
       <div className="space-y-4">
-        {/* Voice product card */}
-        <div className="rounded-lg border-2 border-border bg-background p-5">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <Mic className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-foreground">Voice</h2>
-              <p className="text-xs text-muted-foreground">
-                AI receptionist for your trades business
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void navigate("/setup/voice")}
-            className="w-full rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-          >
-            Set up Voice
-          </button>
-        </div>
-
-        {/* Quote product card — coming soon */}
-        <div className="rounded-lg border-2 border-border bg-background p-5 opacity-60">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-              <FileText className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-foreground">Quote</h2>
-              <p className="text-xs text-muted-foreground">
-                Mobile quoting app — coming soon
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            disabled
-            className="w-full rounded-md bg-muted py-2 text-sm font-semibold text-muted-foreground cursor-not-allowed"
-          >
-            Coming soon
-          </button>
-        </div>
+        <ProductCard
+          title="Voice"
+          description="AI receptionist for your trades business"
+          icon={Mic}
+          available={true}
+          onSelect={() => void navigate("/setup/voice")}
+        />
+        <ProductCard
+          title="Quote"
+          description="Mobile quoting app — coming soon"
+          icon={FileText}
+          available={false}
+        />
       </div>
     </div>
   );

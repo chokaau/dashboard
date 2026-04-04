@@ -124,7 +124,7 @@ describe("SignInPage", () => {
     fireEvent.blur(screen.getByLabelText(/email/i));
 
     await waitFor(() => {
-      expect(screen.getByText(/invalid email/i)).toBeInTheDocument();
+      expect(screen.getByText(/valid email/i)).toBeInTheDocument();
     });
   });
 

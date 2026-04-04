@@ -36,6 +36,17 @@ vi.mock("@/adapters/cognito-auth-provider", () => ({
 }));
 
 vi.mock("@chokaau/ui", () => ({
+  ActivationBanner: ({ status, onDismiss }: { status: string; onDismiss?: () => void }) =>
+    status === "pending" ? (
+      <div role="alert">
+        <p>Your Voice service is being reviewed.</p>
+        {onDismiss && (
+          <button type="button" aria-label="Dismiss" onClick={onDismiss}>
+            ×
+          </button>
+        )}
+      </div>
+    ) : null,
   DashboardStatCard: ({ label }: { label: string }) => (
     <div data-testid="stat-card">{label}</div>
   ),

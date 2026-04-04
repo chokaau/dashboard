@@ -3,31 +3,26 @@
  *
  * Moved from SetupPage.tsx to /setup/forwarding sub-route (dashboard-10).
  *
- * Step 1: Select carrier (Telstra / Optus / Vodafone / Other)
+ * Step 1: Select carrier (via CarrierSelector from @chokaau/ui)
  * Step 2: Disable voicemail (instructions)
- * Step 3: Activate forwarding (dial code shown)
+ * Step 3: Activate forwarding (dial code shown via UssdCodeDisplay)
  * Step 4: Confirm & test
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
-import { StepHeader } from "@/components/StepHeader";
+import { StepHeader, CarrierSelector, UssdCodeDisplay } from "@chokaau/ui";
 
-type Carrier = "telstra" | "optus" | "vodafone" | "other";
+type AuCarrier = "telstra" | "optus" | "vodafone" | "other";
 
-const CARRIERS: { id: Carrier; label: string }[] = [
-  { id: "telstra", label: "Telstra" },
-  { id: "optus", label: "Optus" },
-  { id: "vodafone", label: "Vodafone" },
-  { id: "other", label: "Other" },
-];
-
-const FORWARD_CODES: Record<Carrier, string> = {
+const FORWARD_CODES: Record<AuCarrier, string> = {
   telstra: "**61*<CHOKA_NUMBER>%23",
   optus: "**61*<CHOKA_NUMBER>%23",
   vodafone: "**61*<CHOKA_NUMBER>%23",
   other: "**61*<CHOKA_NUMBER>%23",
 };
+
+const VOICEMAIL_DISABLE_CODE = "##002#";
 
 const TOTAL_STEPS = 4;
 
@@ -35,33 +30,18 @@ function Step1CarrierSelect({
   selected,
   onSelect,
 }: {
-  selected: Carrier | null;
-  onSelect: (c: Carrier) => void;
+  selected: AuCarrier | null;
+  onSelect: (c: AuCarrier) => void;
 }) {
   return (
     <>
       <StepHeader step={1} totalSteps={TOTAL_STEPS} title="Who is your phone provider?" />
-      <div className="grid grid-cols-2 gap-3">
-        {CARRIERS.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => onSelect(c.id)}
-            className={`rounded-lg border-2 px-4 py-5 text-sm font-medium transition-colors ${
-              selected === c.id
-                ? "border-primary bg-primary/5 text-primary"
-                : "border-border bg-background text-foreground hover:border-primary/40"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      <CarrierSelector selectedCarrier={selected ?? undefined} onChange={onSelect} />
     </>
   );
 }
 
-function Step2DisableVoicemail({ carrier }: { carrier: Carrier }) {
+function Step2DisableVoicemail() {
   return (
     <>
       <StepHeader step={2} totalSteps={TOTAL_STEPS} title="First, turn off voicemail" />
@@ -82,7 +62,7 @@ function Step2DisableVoicemail({ carrier }: { carrier: Carrier }) {
           <span>
             Dial{" "}
             <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-              {carrier === "telstra" ? "##002#" : "##002#"}
+              {VOICEMAIL_DISABLE_CODE}
             </code>{" "}
             and press call
           </span>
@@ -98,7 +78,7 @@ function Step2DisableVoicemail({ carrier }: { carrier: Carrier }) {
   );
 }
 
-function Step3ActivateForwarding({ carrier }: { carrier: Carrier }) {
+function Step3ActivateForwarding({ carrier }: { carrier: AuCarrier }) {
   const code = FORWARD_CODES[carrier];
   return (
     <>
@@ -106,32 +86,7 @@ function Step3ActivateForwarding({ carrier }: { carrier: Carrier }) {
       <p className="mb-4 text-sm text-muted-foreground">
         Now set your phone to forward unanswered calls to Choka.
       </p>
-      <ol className="space-y-3 text-sm">
-        <li className="flex gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-            1
-          </span>
-          Open your phone dialer
-        </li>
-        <li className="flex gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-            2
-          </span>
-          <span>
-            Dial{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-              {code}
-            </code>{" "}
-            and press call
-          </span>
-        </li>
-        <li className="flex gap-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-            3
-          </span>
-          Wait for the confirmation message
-        </li>
-      </ol>
+      <UssdCodeDisplay code={code} phoneNumber="<CHOKA_NUMBER>" />
     </>
   );
 }
@@ -156,7 +111,7 @@ function Step4Confirm() {
 export function ForwardingSetupWizard() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [carrier, setCarrier] = useState<Carrier | null>(null);
+  const [carrier, setCarrier] = useState<AuCarrier | null>(null);
 
   const canNext = step === 1 ? carrier !== null : step < TOTAL_STEPS;
 
@@ -203,7 +158,7 @@ export function ForwardingSetupWizard() {
         {step === 1 && (
           <Step1CarrierSelect selected={carrier} onSelect={setCarrier} />
         )}
-        {step === 2 && <Step2DisableVoicemail carrier={carrier ?? "other"} />}
+        {step === 2 && <Step2DisableVoicemail />}
         {step === 3 && <Step3ActivateForwarding carrier={carrier ?? "other"} />}
         {step === 4 && <Step4Confirm />}
       </div>

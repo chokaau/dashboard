@@ -1,0 +1,174 @@
+/* ============================================================
+ * SEMANTIC TOKENS — shadcn/ui pattern
+ * Light mode: :root {}
+ * Dark mode:  .dark {}
+ * System dark: @media (prefers-color-scheme: dark) inside :root:not(.light)
+ * ============================================================ */
+
+:root {
+  /* === SEMANTIC SURFACE & TEXT === */
+  --background: #ffffff;
+  --foreground: #1c1917;
+  --card: #fafaf9;
+  --card-foreground: #1c1917;
+  --popover: #ffffff;
+  --popover-foreground: #1c1917;
+
+  /* === BRAND === */
+  --primary: #b45309;
+  --primary-foreground: #ffffff;
+
+  /* === SECONDARY & MUTED === */
+  --secondary: #f5f5f4;
+  --secondary-foreground: #44403c;
+  --muted: #f5f5f4;
+  --muted-foreground: #78716c;
+
+  /* === ACCENT === */
+  --accent: #fbbf24;
+  --accent-foreground: #78350f;
+
+  /* === DESTRUCTIVE === */
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+
+  /* === BORDERS & INPUTS === */
+  --border: #e7e5e4;
+  --input: #e7e5e4;
+  --ring: #b45309;
+
+  /* === RADIUS === */
+  --radius: 0.75rem;
+
+  /* === SIDEBAR === */
+  --sidebar: #1c1917;
+  --sidebar-foreground: #e7e5e4;
+
+  /* === SEMANTIC STATUS === */
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --info: #0369a1;
+  --info-foreground: #ffffff;
+
+  /* === TYPOGRAPHY === */
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* === SPACING (4px grid) === */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* === SHADOWS === */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================
+ * DARK MODE — "warm evening, not a dark room"
+ * Surface hierarchy: sidebar (#141210) < page (#1e1b18) < card (#272320) < modal (#302c28)
+ * Primary: amber-400 (#fbbf24) — reduces chromatic halation on dark backgrounds
+ * Text: warm off-white (#f2ede8) — integrates with warm surfaces
+ * Semantic: desaturated pastels (green-300, red-300, sky-300, amber-300)
+ * WCAG AA verified: all text/surface pairs pass 4.5:1 minimum
+ * ============================================================ */
+.dark {
+  --background: #1e1b18;
+  --foreground: #f2ede8;
+  --card: #272320;
+  --card-foreground: #f2ede8;
+  --popover: #302c28;
+  --popover-foreground: #f2ede8;
+
+  --primary: #fbbf24;
+  --primary-foreground: #1a1100;
+
+  --secondary: #272320;
+  --secondary-foreground: #c8c3bc;
+  --muted: #272320;
+  --muted-foreground: #a8a29e;
+
+  --accent: #302c28;
+  --accent-foreground: #fbbf24;
+
+  --destructive: #fca5a5;
+  --destructive-foreground: #450a0a;
+
+  --border: #3d3830;
+  --input: #3d3830;
+  --ring: #fbbf24;
+
+  --sidebar: #141210;
+  --sidebar-foreground: #c8c3bc;
+
+  --success: #86efac;
+  --success-foreground: #052e16;
+  --warning: #fcd34d;
+  --warning-foreground: #1c0f00;
+  --info: #7dd3fc;
+  --info-foreground: #082f49;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #1e1b18;
+    --foreground: #f2ede8;
+    --card: #272320;
+    --card-foreground: #f2ede8;
+    --popover: #302c28;
+    --popover-foreground: #f2ede8;
+
+    --primary: #fbbf24;
+    --primary-foreground: #1a1100;
+
+    --secondary: #272320;
+    --secondary-foreground: #c8c3bc;
+    --muted: #272320;
+    --muted-foreground: #a8a29e;
+
+    --accent: #302c28;
+    --accent-foreground: #fbbf24;
+
+    --destructive: #fca5a5;
+    --destructive-foreground: #450a0a;
+
+    --border: #3d3830;
+    --input: #3d3830;
+    --ring: #fbbf24;
+
+    --sidebar: #141210;
+    --sidebar-foreground: #c8c3bc;
+
+    --success: #86efac;
+    --success-foreground: #052e16;
+    --warning: #fcd34d;
+    --warning-foreground: #1c0f00;
+    --info: #7dd3fc;
+    --info-foreground: #082f49;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

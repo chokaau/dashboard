@@ -24,6 +24,7 @@ import {
 } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
 import { ConfigurationError } from "@/components/error-boundaries/ConfigurationError";
+import { AuthContextProvider } from "@chokaau/ui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +33,8 @@ import { ConfigurationError } from "@/components/error-boundaries/ConfigurationE
 export interface AuthUser {
   username: string;
   tenantSlug: string;
+  email: string;
+  displayName: string;
 }
 
 export interface AuthContextValue {
@@ -193,8 +196,11 @@ function CognitoAuthProviderInner({ children }: CognitoAuthProviderProps) {
         (claims["custom:tenant_slug"] as string | undefined) ??
         cognitoUser.username;
 
+      const email = (claims["email"] as string | undefined) ?? "";
+      const displayName = (claims["name"] as string | undefined) ?? cognitoUser.username;
+
       if (isMounted.current) {
-        setUser({ username: cognitoUser.username, tenantSlug });
+        setUser({ username: cognitoUser.username, tenantSlug, email, displayName });
         setIsAuthenticated(true);
       }
     } catch {
@@ -294,9 +300,21 @@ function CognitoAuthProviderInner({ children }: CognitoAuthProviderProps) {
   // Expose for apiFetch (outside React tree)
   _authContextRef = value;
 
+  // Bridge to @chokaau/ui AuthContextProvider so DashboardLayout's UserMenu works
+  const uiAuthValue = {
+    isLoaded,
+    isSignedIn: isAuthenticated,
+    user: user
+      ? { id: user.username, email: user.email, displayName: user.displayName }
+      : null,
+    signOut,
+  };
+
   return (
     <CognitoAuthContext.Provider value={value}>
-      {children}
+      <AuthContextProvider value={uiAuthValue}>
+        {children}
+      </AuthContextProvider>
     </CognitoAuthContext.Provider>
   );
 }

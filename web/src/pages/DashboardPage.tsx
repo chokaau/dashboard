@@ -108,7 +108,7 @@ export function DashboardPage() {
           <DashboardStatCard label="Total calls" isLoading />
           <DashboardStatCard label="Avg duration" isLoading />
         </div>
-        <NeedsCallbackPanel calls={[]} isLoading />
+        <NeedsCallbackPanel leads={[]} onCallback={() => {}} />
       </div>
     );
   }
@@ -168,7 +168,7 @@ export function DashboardPage() {
 
       {/* Needs callback panel */}
       <NeedsCallbackPanel
-        calls={callbackLeads}
+        leads={callbackLeads}
         onCallback={(phone) => {
           if (navigator.clipboard) {
             void navigator.clipboard.writeText(phone);

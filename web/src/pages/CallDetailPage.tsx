@@ -153,7 +153,7 @@ export function CallDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-full">
         <div className="border-b border-border p-4">
           <Skeleton className="h-5 w-20" />
         </div>
@@ -164,7 +164,7 @@ export function CallDetailPage() {
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen p-6">
+      <div className="min-h-full p-6">
         <Link
           to="/calls"
           aria-label="Back to call history"
@@ -187,7 +187,7 @@ export function CallDetailPage() {
     : [];
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-full pb-24">
       {/* Header / back nav */}
       <div className="sticky top-0 z-10 border-b border-border bg-background px-4 py-3">
         <Link

@@ -9,4 +9,12 @@ export default defineConfig({
     dedupe: ["react", "react-dom", "lucide-react"],
     alias: [{ find: /^@\/(.*)/, replacement: `${resolve(__dirname, "./src")}/$1` }],
   },
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
+  },
 });

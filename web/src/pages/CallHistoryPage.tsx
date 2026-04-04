@@ -126,7 +126,7 @@ export function CallHistoryPage() {
   // Render
   // ------------------------------------------------------------------
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-full flex-col">
       {/* Sticky filter bar */}
       <CallHistoryFilterBar
         activeTab={toFilterBarTab(status)}

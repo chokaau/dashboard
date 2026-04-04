@@ -19,6 +19,10 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.49b0",
     "ruamel.yaml>=0.18",
     "zoneinfo>=0.2; python_version < '3.9'",
+    "sqlalchemy[asyncio]>=2.0",
+    "alembic>=1.13",
+    "asyncpg>=0.29",
+    "opentelemetry-instrumentation-sqlalchemy>=0.45b0",
 ]
 
 [project.optional-dependencies]

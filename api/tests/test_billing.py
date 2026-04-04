@@ -155,14 +155,24 @@ def test_billing_unknown_fields_ignored(client, auth_headers, app_no_redis):
 
 
 def test_billing_paid_plan_rejected(client, auth_headers, app_no_redis):
-    """plan = 'paid' is not valid for Phase 1 — should cause error or be rejected."""
+    """plan = 'paid' is not valid for Phase 1 (BillingConfig Literal["trial"]).
+
+    After story 003-005, invalid S3 data degrades gracefully to the synthetic
+    14-day trial response (200) instead of raising a 5xx error. This ensures
+    billing is always available even when S3 data is malformed.
+    """
     data = {**_billing_json(), "plan": "paid"}
     session = _mock_s3_billing(data)
     with patch("app.routes.billing.aioboto3.Session", return_value=session):
         resp = client.get("/api/billing", headers=auth_headers)
 
-    # Phase 1 only supports "trial" — paid plan should return error
-    assert resp.status_code in (422, 500, 400)
+    # Invalid S3 data → synthetic 14-day trial response (graceful degradation)
+    assert resp.status_code == 200
+    body = resp.json()
+    # Synthetic response fields
+    assert body["plan"] == "trial"
+    assert body["trialDaysRemaining"] == 14
+    assert body["isTrialExpired"] is False
 
 
 # ---------------------------------------------------------------------------

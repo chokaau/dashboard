@@ -18,9 +18,8 @@ class AppConfig(BaseSettings):
     s3_config_bucket: str = ""
     s3_recordings_bucket: str = ""
 
-    # Redis
+    # Redis (rate limiting and SSE only — metadata reads removed in Phase 4)
     redis_url: str = "redis://localhost:6379"
-    redis_metadata_enabled: bool = True
 
     # SSE
     sse_ping_interval_seconds: int = 30
@@ -48,6 +47,15 @@ class AppConfig(BaseSettings):
 
     # SNS alarms topic ARN — used for activation request notifications
     sns_alarms_topic_arn: str = ""
+
+    # Database — PostgreSQL via RDS
+    # Resolution order: database_secret_arn (prod/ECS) > database_url (local dev) > disabled
+    database_secret_arn: str = ""   # AWS Secrets Manager ARN — injected as env var in ECS task definition
+    database_url: str = ""          # Local dev only — direct connection URL bypasses Secrets Manager
+    db_pool_size: int = 5
+    db_max_overflow: int = 2
+    db_pool_timeout: int = 10
+    db_pool_recycle: int = 1800
 
 
 def get_config() -> AppConfig:

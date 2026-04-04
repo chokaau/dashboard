@@ -14,9 +14,11 @@ import {
   createBrowserRouter,
   Navigate,
   Outlet,
+  useLocation,
 } from "react-router-dom";
 import { PageErrorBoundary } from "@/components/error-boundaries/PageErrorBoundary";
 import { AuthGuard } from "@/components/AuthGuard";
+import { DashboardLayout } from "@chokaau/ui";
 
 // Lazy-loaded pages (code-split per route)
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
@@ -46,9 +48,18 @@ function PageShell() {
 }
 
 function ProtectedShell() {
+  const location = useLocation();
+  const activePage = "/" + location.pathname.split("/")[1];
+
   return (
     <AuthGuard>
-      <PageShell />
+      <DashboardLayout activePage={activePage}>
+        <PageErrorBoundary>
+          <Suspense fallback={<div className="flex min-h-screen items-center justify-center" aria-label="Loading" />}>
+            <Outlet />
+          </Suspense>
+        </PageErrorBoundary>
+      </DashboardLayout>
     </AuthGuard>
   );
 }

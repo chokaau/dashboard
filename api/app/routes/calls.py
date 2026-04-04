@@ -192,10 +192,10 @@ async def get_call(
         log.error("call_detail_s3_error", call_id=call_id, error=str(exc))
         raise HTTPException(status_code=500, detail="Storage error") from exc
 
+    # PII invariant: phone_hash is a server-side field only — never exposed.
     return {
         "id": call_id,
         "callerName": pg_call.caller_name or "Unknown caller",
-        "callerPhone": pg_call.phone_hash or "",
         "duration": str(pg_call.duration_s or 0),
         "status": pg_call.status,
         "intent": pg_call.intent or "info",

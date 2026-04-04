@@ -153,10 +153,13 @@ def _map_call_to_response(call: Any, now_melb: datetime) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _compute_stats(calls: list[dict[str, Any]], now_melb: datetime) -> dict[str, Any]:
+def _compute_stats(
+    calls: list[dict[str, Any]], now_melb: datetime, *, db_total: int
+) -> dict[str, Any]:
     """Compute today/total/needs-callback stats from calls list.
 
     'Today' boundary is Australia/Melbourne midnight, not UTC.
+    ``db_total`` is the full count from the database (not page-bounded).
     """
     total_today = 0
     needs_callback = 0
@@ -170,7 +173,7 @@ def _compute_stats(calls: list[dict[str, Any]], now_melb: datetime) -> dict[str,
     return {
         "totalToday": total_today,
         "needsCallback": needs_callback,
-        "total": len(calls),
+        "total": db_total,
     }
 
 
@@ -215,7 +218,7 @@ async def get_call_list(
             date_to=date_to,
         )
         calls = [_map_call_to_response(c, now_melb) for c in pg_result.calls]
-        stats = _compute_stats(calls, now_melb)
+        stats = _compute_stats(calls, now_melb, db_total=pg_result.total)
         return {
             "calls": calls,
             "pagination": {

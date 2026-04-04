@@ -13,7 +13,7 @@ import uuid
 from typing import Any, Protocol, runtime_checkable
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError, TimeoutError as SATimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,14 +85,13 @@ class SQLAlchemyTenantConfigRepository:
                     set_={
                         "config": config,
                         "version": TenantConfig.version + 1,
-                        "updated_at": TenantConfig.updated_at,
+                        "updated_at": func.now(),
                     },
                 )
                 .returning(TenantConfig)
             )
             result = await self._session.execute(stmt)
             row = result.scalar_one()
-            await self._session.commit()
             return row
         except SATimeoutError as exc:
             raise DBPoolExhaustedError("DB pool exhausted") from exc

@@ -244,9 +244,8 @@ def test_get_call_detail_happy_path(client, auth_headers, app_no_redis, monkeypa
     assert body["transcript"] == [{"role": "agent", "text": "How can I help?"}]
     assert "agentActions" in body
     assert body["summary"] == "Billing query."
-    caller_phone = body.get("callerPhone", "")
-    au_re = re.compile(r"\+61[1-9]\d{8}")
-    assert not au_re.search(str(caller_phone))
+    # SEC-001: callerPhone must not appear in response (PII invariant)
+    assert "callerPhone" not in body
 
 
 def test_get_call_401_without_token(client):
@@ -333,12 +332,12 @@ def test_s3_archive_key_derived_from_start_time():
 
 
 # ---------------------------------------------------------------------------
-# AC4: callerPhone present in response (as phone_hash, not raw number)
+# AC4 / SEC-001: callerPhone (phone_hash) must NOT appear in response
 # ---------------------------------------------------------------------------
 
 
-def test_caller_phone_in_response(client, auth_headers, app_no_redis, monkeypatch):
-    """AC4: callerPhone field is present in response."""
+def test_caller_phone_not_in_response(client, auth_headers, app_no_redis, monkeypatch):
+    """SEC-001: callerPhone field must NOT be present — phone_hash is PII."""
     s3_mock = _make_s3_session_mock(archive_body=b"{}")
     monkeypatch.setattr("app.routes.calls.aioboto3.Session", lambda: s3_mock)
 
@@ -347,8 +346,8 @@ def test_caller_phone_in_response(client, auth_headers, app_no_redis, monkeypatc
     assert resp.status_code == 200
 
     body = resp.json()
-    assert "callerPhone" in body
-    assert body["callerPhone"] == "abc123def456abcd"
+    assert "callerPhone" not in body
+    assert "phone_hash" not in body
 
 
 # ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Protocol, Sequence, runtime_checkable
 
 import structlog
@@ -100,6 +101,12 @@ class SQLAlchemyCallRepository:
             ]
             if status is not None:
                 base_filter.append(Call.status == status)
+            if date_from is not None:
+                date_from_dt = datetime.fromisoformat(date_from)
+                base_filter.append(Call.start_time >= date_from_dt)
+            if date_to is not None:
+                date_to_dt = datetime.fromisoformat(date_to)
+                base_filter.append(Call.start_time <= date_to_dt)
 
             # COUNT subquery
             count_stmt = select(func.count()).select_from(Call).where(*base_filter)

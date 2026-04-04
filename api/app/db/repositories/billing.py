@@ -13,7 +13,7 @@ import uuid
 from typing import Protocol, runtime_checkable
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError, TimeoutError as SATimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,14 +87,13 @@ class SQLAlchemyBillingRepository:
                         "trial_days": row.trial_days,
                         "activation_status": row.activation_status,
                         "product": row.product,
-                        "updated_at": BillingUsage.updated_at,
+                        "updated_at": func.now(),
                     },
                 )
                 .returning(BillingUsage)
             )
             result = await self._session.execute(stmt)
             upserted = result.scalar_one()
-            await self._session.commit()
             return upserted
         except SATimeoutError as exc:
             raise DBPoolExhaustedError("DB pool exhausted") from exc

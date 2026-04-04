@@ -160,6 +160,12 @@ def create_app() -> FastAPI:
     async def db_connection_handler(
         request: Request, exc: DBConnectionError
     ) -> JSONResponse:
+        # NOTE: Known TOCTOU race — concurrent DBConnectionError exceptions
+        # could trigger parallel engine swaps, orphaning the intermediate
+        # engine (its .dispose() would be skipped). In practice this is
+        # low-probability because credential rotation is rare and asyncio
+        # is single-threaded, but a proper fix would guard this block with
+        # an asyncio.Lock. Acceptable risk for now.
         secret_arn = getattr(request.app.state, "db_secret_arn", None)
         if secret_arn:
             try:

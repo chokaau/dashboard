@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@chokaau/ui':
-        specifier: ^0.1.0
-        version: 0.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)
+        specifier: ^0.3.0
+        version: 0.3.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)
       '@radix-ui/react-focus-scope':
         specifier: ^1.1.5
         version: 1.1.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -384,8 +384,8 @@ packages:
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
 
-  '@chokaau/ui@0.1.2':
-    resolution: {integrity: sha512-1yO41rG8Q1+g842qD4hLljN2/CB5ZU4q+QE/0P01zrXT79gJSzsmXL1KqcwCzNnNsn3zRVYn//ku0L5JR8cSog==, tarball: https://npm.pkg.github.com/download/@chokaau/ui/0.1.2/648bb6780960f8484b54c1db72acbb56634f36f3}
+  '@chokaau/ui@0.3.0':
+    resolution: {integrity: sha512-wvjSabfa0txqJD9EdsNJyNDiIGuixAiDFPMvmSKsqqHHiWUf+Af/QdsFEy7fI3f3B66/7NS0YUduPEEd3eW/fw==, tarball: https://npm.pkg.github.com/download/@chokaau/ui/0.3.0/15ac82fc280da60206aafbd4923b03215436751c}
 
   '@csstools/color-helpers@5.1.0':
     resolution: {integrity: sha512-S11EXWJyy0Mz5SYvRmY8nJYTFFd1LCNV+7cXyAgQtOOuzb4EsgfqDufL+9esx72/eLhsRdGZwaldu/h+E4t4BA==}
@@ -4099,7 +4099,7 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@chokaau/ui@0.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)':
+  '@chokaau/ui@0.3.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)':
     dependencies:
       '@radix-ui/react-accordion': 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-alert-dialog': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

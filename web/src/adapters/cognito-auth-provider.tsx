@@ -241,19 +241,25 @@ function CognitoAuthProviderInner({ children }: CognitoAuthProviderProps) {
       if (hasPendingRegistration()) {
         const pending = readPendingRegistration();
         if (pending) {
-          const session = await fetchAuthSession();
-          const token = session.tokens?.idToken?.toString();
-          if (token) {
-            await fetch("/api/auth/register", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(pending),
-            });
+          try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+            if (token) {
+              await fetch("/api/auth/register", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(pending),
+              });
+            }
+            clearPendingRegistration();
+          } catch {
+            // BFF may not be running yet — registration will be retried on next sign-in.
+            // Don't clear sessionStorage so it retries next time.
+            console.warn("Registration deferred — BFF unavailable");
           }
-          clearPendingRegistration();
         }
       }
 

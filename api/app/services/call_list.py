@@ -1,27 +1,31 @@
-"""Call list service — story-4-1.
+"""Call list service — PostgreSQL-only read path (Phase 4).
 
-Reads call metadata from Redis sorted set + hash pipeline.
-Falls back to S3 scan when Redis index is empty.
-Enforces tenant isolation: all keys scoped to env_short + tenant_slug.
+Story 003-003: dual-read (PG primary + Redis fallback).
+Story 004-002: Redis fallback removed. PostgreSQL is the sole source of truth.
+
+Read path resolution order (Phase 4):
+  1. If repo is not None and returns calls → format and return PG data.
+  2. If repo returns empty → return empty result.
+  3. If repo is None → return empty result with degraded=True.
+
 PII invariant: caller phone numbers never appear in any return value.
+Port: service accepts CallRepositoryPort | None (not AsyncSession).
 """
 
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from zoneinfo import ZoneInfo
 
+if TYPE_CHECKING:
+    from app.db.repositories.calls import CallRepositoryPort
+
 log = structlog.get_logger()
 
 _MELB_TZ = ZoneInfo("Australia/Melbourne")
-
-# Structured log event names
-_CALL_LIST_DEGRADED = "call_list_degraded"
-_CALL_LIST_S3_FALLBACK = "call_list_s3_fallback"
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +66,7 @@ def _format_timestamp(call_time_utc: datetime, now_melb: datetime) -> str:
     return call_melb.strftime("%-d %b ") + time_str
 
 
-def _derive_caller_name(caller_name: str) -> str:
+def _derive_caller_name(caller_name: str | None) -> str:
     """Derive callerName from stored metadata (no raw phone numbers).
 
     Priority: caller_name from details > "Unknown caller".
@@ -73,105 +77,75 @@ def _derive_caller_name(caller_name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Redis read path
+# Date range parsing
 # ---------------------------------------------------------------------------
 
 
-async def _read_calls_from_redis(
-    redis: Any,
-    env_short: str,
-    tenant_slug: str,
-    page: int,
-    page_size: int,
-    status_filter: str | None,
-) -> tuple[list[dict[str, Any]], bool]:
-    """Read paginated calls from Redis sorted set + hash.
+def _parse_date_range(date_range: str | None) -> tuple[str | None, str | None]:
+    """Parse date_range string into (date_from, date_to) ISO strings.
 
-    Returns (calls_list, degraded_flag).
-    Sorted set: call_index:{env}:{tenant_slug}  (score = start_time timestamp)
-    Hash:       call_meta:{env}:{tenant_slug}:{call_id}
+    Supported formats:
+      "Nd"       — relative N days back from now (e.g. "7d", "30d")
+      "today"    — today midnight to now
+      "yesterday"— yesterday midnight to yesterday 23:59:59
+      "YYYY-MM-DD/YYYY-MM-DD" — absolute range
+    Returns (date_from, date_to) as ISO-8601 strings or (None, None).
     """
-    index_key = f"call_index:{env_short}:{tenant_slug}"
+    if not date_range:
+        return None, None
 
-    total = await redis.zcard(index_key)
-    if total == 0:
-        return [], False
+    now = datetime.now(timezone.utc)
 
-    # ZREVRANGEBYSCORE for reverse-chron order with pagination
-    offset = (page - 1) * page_size
-    # Fetch extra items for status filtering if filter is active
-    fetch_size = page_size * 3 if status_filter else page_size
-    members_scores = await redis.zrevrangebyscore(
-        index_key,
-        max="+inf",
-        min="-inf",
-        withscores=True,
-        start=offset,
-        num=fetch_size,
-    )
+    if date_range.endswith("d") and date_range[:-1].isdigit():
+        days = int(date_range[:-1])
+        date_from = (now - timedelta(days=days)).isoformat()
+        return date_from, None
 
-    calls: list[dict[str, Any]] = []
-    degraded = False
-    now_melb = datetime.now(_MELB_TZ)
+    if date_range == "today":
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        return today_start.isoformat(), None
 
-    for call_id, score in members_scores:
-        meta_key = f"call_meta:{env_short}:{tenant_slug}:{call_id}"
-        meta = await redis.hgetall(meta_key)
+    if date_range == "yesterday":
+        yesterday_start = (now - timedelta(days=1)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        yesterday_end = yesterday_start.replace(hour=23, minute=59, second=59)
+        return yesterday_start.isoformat(), yesterday_end.isoformat()
 
-        if not meta:
-            degraded = True
-            log.warning(_CALL_LIST_DEGRADED, call_id=call_id, reason="missing_hash")
-            continue
+    if "/" in date_range:
+        parts = date_range.split("/", 1)
+        if len(parts) == 2:
+            return parts[0], parts[1]
 
-        # Tenant isolation: skip if hash tenant_slug doesn't match
-        hash_tenant = meta.get("tenant_slug", "")
-        if hash_tenant and hash_tenant != tenant_slug:
-            continue
-
-        status = meta.get("status", "unknown")
-        if status_filter and status != status_filter:
-            continue
-
-        start_ts = float(meta.get("start_time", score))
-        call_time_utc = datetime.fromtimestamp(start_ts, tz=timezone.utc)
-        duration_s = int(meta.get("duration_s", 0))
-
-        call_item = {
-            "id": call_id,
-            "callerName": _derive_caller_name(meta.get("caller_name", "")),
-            "duration": _format_duration(duration_s),
-            "timestamp": _format_timestamp(call_time_utc, now_melb),
-            "status": status,
-            "needsCallback": meta.get("needs_callback", "false") == "true",
-            "intent": meta.get("intent", "info"),
-        }
-        calls.append(call_item)
-
-        if len(calls) >= page_size:
-            break
-
-    return calls, degraded
+    return None, None
 
 
 # ---------------------------------------------------------------------------
-# S3 fallback (stub — full impl in story-7-x backfill)
+# ORM → response dict mapper (PII-safe)
 # ---------------------------------------------------------------------------
 
 
-async def s3_scan_fallback(
-    s3_client: Any,
-    bucket: str,
-    env_short: str,
-    tenant_slug: str,
-    max_objects: int = 500,
-) -> list[dict[str, Any]]:
-    """Scan S3 for call archives when Redis index is empty.
+def _map_call_to_response(call: Any, now_melb: datetime) -> dict[str, Any]:
+    """Map a Call ORM object to the API response dict.
 
-    Returns a list of minimal call records. Fires async Redis backfill.
-    This is a thin stub — real pagination + backfill implemented in story-7-x.
+    Explicitly excludes: phone_hash, caller_number (PII invariant).
     """
-    log.info(_CALL_LIST_S3_FALLBACK, tenant_slug=tenant_slug)
-    return []
+    start_time = call.start_time
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+
+    duration_s = call.duration_s or 0
+    return {
+        "id": call.id,
+        "callerName": _derive_caller_name(call.caller_name),
+        "duration": _format_duration(duration_s),
+        "timestamp": _format_timestamp(start_time, now_melb),
+        "status": call.status,
+        "needsCallback": bool(call.needs_callback),
+        "intent": call.intent,
+        "hasRecording": bool(call.has_recording),
+        "summary": call.summary,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -184,13 +158,11 @@ def _compute_stats(calls: list[dict[str, Any]], now_melb: datetime) -> dict[str,
 
     'Today' boundary is Australia/Melbourne midnight, not UTC.
     """
-    today_str = now_melb.strftime("%Y-%m-%d")
     total_today = 0
     needs_callback = 0
 
     for call in calls:
-        # Reparse the formatted timestamp to check if it's today
-        if call["timestamp"].startswith("Today"):
+        if call.get("timestamp", "").startswith("Today"):
             total_today += 1
         if call.get("needsCallback"):
             needs_callback += 1
@@ -203,12 +175,13 @@ def _compute_stats(calls: list[dict[str, Any]], now_melb: datetime) -> dict[str,
 
 
 # ---------------------------------------------------------------------------
-# Public entry point
+# Public entry point — PostgreSQL only (Phase 4)
 # ---------------------------------------------------------------------------
 
 
 async def get_call_list(
-    redis: Any,
+    *,
+    repo: "CallRepositoryPort | None",
     env_short: str,
     tenant_slug: str,
     page: int = 1,
@@ -216,49 +189,47 @@ async def get_call_list(
     status_filter: str | None = None,
     date_range: str | None = None,
 ) -> dict[str, Any]:
-    """Fetch paginated call list for a tenant.
+    """Fetch paginated call list for a tenant from PostgreSQL.
+
+    Phase 4: Redis fallback removed. PostgreSQL is the sole source of truth.
 
     Returns:
         {
             "calls": [...],
             "pagination": {"page": int, "pageSize": int, "total": int},
             "stats": {"totalToday": int, "needsCallback": int, "total": int},
-            "degraded": bool  (omitted when False)
+            "degraded": bool  (only present when True — no DB configured)
         }
     """
-    calls: list[dict[str, Any]] = []
-    degraded = False
-    total_count = 0
-
-    if redis is not None:
-        index_key = f"call_index:{env_short}:{tenant_slug}"
-        zcard = await redis.zcard(index_key)
-        total_count = zcard
-
-        if zcard == 0:
-            # Redis index empty — S3 fallback (stub returns [] for now)
-            calls = await s3_scan_fallback(None, "", env_short, tenant_slug)
-        else:
-            calls, degraded = await _read_calls_from_redis(
-                redis, env_short, tenant_slug, page, page_size, status_filter
-            )
-
+    date_from, date_to = _parse_date_range(date_range)
     now_melb = datetime.now(_MELB_TZ)
-    stats = _compute_stats(calls, now_melb)
 
-    # total is zcard (all records in the sorted set). When a status filter is
-    # active, zcard counts all statuses so the total is approximate.
-    result: dict[str, Any] = {
-        "calls": calls,
-        "pagination": {
-            "page": page,
-            "pageSize": page_size,
-            "total": total_count,
-        },
-        "stats": stats,
+    if repo is not None:
+        pg_result = await repo.list_calls(
+            tenant_slug=tenant_slug,
+            env=env_short,
+            page=page,
+            page_size=page_size,
+            status=status_filter,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        calls = [_map_call_to_response(c, now_melb) for c in pg_result.calls]
+        stats = _compute_stats(calls, now_melb)
+        return {
+            "calls": calls,
+            "pagination": {
+                "page": page,
+                "pageSize": page_size,
+                "total": pg_result.total,
+            },
+            "stats": stats,
+        }
+
+    # No DB configured — degraded empty result
+    return {
+        "calls": [],
+        "pagination": {"page": page, "pageSize": page_size, "total": 0},
+        "stats": {"totalToday": 0, "needsCallback": 0, "total": 0},
+        "degraded": True,
     }
-
-    if degraded:
-        result["degraded"] = True
-
-    return result

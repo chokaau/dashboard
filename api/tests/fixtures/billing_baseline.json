@@ -1,0 +1,12 @@
+{
+  "_schema_version": "1.0",
+  "_captured_from": "s3",
+  "_captured_at": "2026-04-04",
+  "_note": "Captured from S3 billing.json path before Phase 3 service rewrite. trialDaysRemaining and trialEndDate are time-sensitive; contract tests check field presence and types, not exact values.",
+  "plan": "trial",
+  "trialDaysRemaining": 14,
+  "trialEndDate": "2026-04-18",
+  "isTrialExpired": false,
+  "activationStatus": "none",
+  "product": ""
+}

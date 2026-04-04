@@ -115,7 +115,59 @@ jobs:
           VITE_API_BASE_URL: /api
 
   # ---------------------------------------------------------------------------
-  # Job 3: infra-outputs
+  # Job 3: api-test
+  # Python BFF integration tests with PostgreSQL 16 and Redis 7.
+  # DATABASE_URL is set directly — no Secrets Manager dependency in CI tests.
+  # ---------------------------------------------------------------------------
+  api-test:
+    name: API Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: voicebff_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python dependencies
+        run: uv sync --all-extras
+
+      - name: Run API tests with coverage
+        run: uv run pytest
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/voicebff_test
+          REDIS_URL: redis://localhost:6379
+
+  # ---------------------------------------------------------------------------
+  # Job 4: infra-outputs
   # Reads OpenTofu outputs from the infrastructure repo to inject into build.
   # ---------------------------------------------------------------------------
   infra-outputs:
@@ -168,11 +220,12 @@ jobs:
   build-and-deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test, infra-outputs]
+    needs: [lint-and-typecheck, test, api-test, infra-outputs]
     if: >-
       always()
       && needs.lint-and-typecheck.result == 'success'
       && needs.test.result == 'success'
+      && needs.api-test.result == 'success'
       && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
     environment: ${{ inputs.environment || 'dev' }}
     permissions:

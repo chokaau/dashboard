@@ -1,0 +1,29 @@
+{
+  "_schema_version": "1.0",
+  "_captured_from": "redis",
+  "_captured_at": "2026-04-04",
+  "_note": "Captured from Redis/S3 path before Phase 3 service rewrite. calls array may be empty in environments with no seeded Redis data. Contract tests compare only the non-underscore fields and their types, not exact values.",
+  "calls": [
+    {
+      "id": "example-call-001",
+      "timestamp": "Today 9:15 AM",
+      "duration": "2m 34s",
+      "status": "missed",
+      "callerName": "Unknown caller",
+      "intent": null,
+      "needsCallback": false,
+      "hasRecording": false,
+      "summary": null
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 20,
+    "total": 1
+  },
+  "stats": {
+    "totalToday": 1,
+    "needsCallback": 0,
+    "total": 1
+  }
+}

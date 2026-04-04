@@ -135,7 +135,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Install OpenTofu
-        uses: opentofu/setup-opentofu@e0cd925cfe004e6c22f8b67081e91805ac1b1cbb
+        uses: opentofu/setup-opentofu@v1
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
 
@@ -169,7 +169,11 @@ jobs:
     name: Build & Deploy
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, test, infra-outputs]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: >-
+      always()
+      && needs.lint-and-typecheck.result == 'success'
+      && needs.test.result == 'success'
+      && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
     environment: ${{ inputs.environment || 'dev' }}
     permissions:
       id-token: write

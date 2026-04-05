@@ -80,22 +80,17 @@ DashboardStatCard: ({
     </div>
   ),
 NeedsCallbackPanel: ({
-    calls,
-    isLoading,
+    leads,
   }: {
-    calls: Array<{ callerName: string }>;
-    isLoading?: boolean;
+    leads: Array<{ callerName: string }>;
+    onCallback?: (phone: string) => void;
   }) => (
     <div data-testid="callback-panel">
-      {isLoading ? (
-        <div className="animate-pulse" />
-      ) : (
-        calls.map((c, i) => (
-          <div key={i} data-testid="callback-lead">
-            {c.callerName}
-          </div>
-        ))
-      )}
+      {leads.map((c, i) => (
+        <div key={i} data-testid="callback-lead">
+          {c.callerName}
+        </div>
+      ))}
     </div>
   ),
 CallCard: ({
